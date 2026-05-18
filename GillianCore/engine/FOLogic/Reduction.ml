@@ -837,31 +837,7 @@ module Cnum = Canonical.Make (struct
 end)
 
 (* Minimal structural reductions that MUST always run regardless of
-   [enable_reductions].  Three categories:
-
-   1. l-nth on a concrete list: the GIL execution model wraps every action
-      result in a list and projects element 0 immediately, so
-      `l-nth([#loc], 0) -> #loc` must always fire or location resolution
-      breaks.
-
-   2. Literal-literal evaluation (via CExprEval): concrete expressions such
-      as `Lit Empty = Lit Empty` must reduce to `Lit (Bool true)` before
-      reaching the goto/assume machinery, otherwise concrete branches are
-      treated as symbolic, producing spurious state splits whose "false"
-      branch contaminates the PFS with `false`.
-
-   3. Set membership on concrete sets: GIL encodes string literals as opaque
-      SMT constants (`str_0`, `str_1`, …) rather than native Z3 strings, so
-      Z3 cannot prove `str_X ≠ str_Y` on its own.  Expressions like
-      `"@construct" ∈ {"@proto", "@call", …}` must be reduced to
-      `Lit (Bool false)` in OCaml (using structural equality) *before* the
-      formula is sent to Z3, otherwise the domain-membership check in
-      `JSILSMemory.get_cell` wrongly returns `false` and the symbolic
-      execution fails with a spurious MIFCell error.
-
-   Everything else (arithmetic canonicalisation, string/list ops, boolean
-   simplification via PFS look-up, etc.) lives in [reduce_lexpr_loop] and is
-   gated by [enable_reductions]. *)
+   [enable_reductions] *)
  let rec reduce_lexpr_minimal
     ?(fuel = 20)
     (pfs : PFS.t)

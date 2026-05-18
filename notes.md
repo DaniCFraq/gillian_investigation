@@ -60,3 +60,19 @@
 [REDUCE_027]
 [REDUCE_040]
 
+
+## Running the program
+
+# JS examples
+
+dune exec -- gillian-js wpst "filename" > "out file"name 2>&1
+
+# WISL examples
+
+dune exec -- wisl verify "filename" > "out filename" 2>&1
+
+# Getting reduction logs
+
+if [[ -f file.log ]]; then grep '^\[REDUCE' file.log | awk '!seen[$0]++' > reduce_unique.log; echo "lines: $(wc -l < reduce_unique.log)"; else echo 'file.log not found'; fi
+
+reduce_unique.log being the output file
