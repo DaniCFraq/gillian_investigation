@@ -1,0 +1,62 @@
+## Simplifications in simple_example.js
+
+# With flag enable_reductions = true
+
+21
+[REDUCE_001]
+[REDUCE_089]
+[REDUCE_004]
+[REDUCE_110]
+[REDUCE_110_a]
+[REDUCE_028]
+[REDUCE_133]
+[REDUCE_028_01]
+[REDUCE_034]
+[REDUCE_005]
+[REDUCE_034_b]
+[REDUCE_140]
+[REDUCE_140_c]
+[REDUCE_092]
+[REDUCE_092_f]
+[REDUCE_040]
+[REDUCE_088]
+[REDUCE_088_a]
+[REDUCE_028_06]
+[REDUCE_028_06c]
+[REDUCE_088_c]
+[REDUCE_088_b]
+
+# With flag enable_reductions = false (ERROR)
+
+
+## Simplifications in tese_simple1.wisl
+
+# With flag enable_reductions = true
+
+24
+[REDUCE_140]
+[REDUCE_140]
+[REDUCE_026]
+[REDUCE_003]
+[REDUCE_140_g]
+[REDUCE_158]
+[REDUCE_144]
+[REDUCE_028]
+[REDUCE_028_25]
+[REDUCE_001]
+[REDUCE_146]
+[REDUCE_146_e]
+[REDUCE_158_c]
+[REDUCE_142]
+[REDUCE_142_b]
+[REDUCE_142_b9]
+[REDUCE_142_b7]
+[REDUCE_004]
+[REDUCE_142_b6]
+[REDUCE_142_b6d]
+[REDUCE_142_b8]
+[REDUCE_156]
+[REDUCE_156_d]
+[REDUCE_027]
+[REDUCE_040]
+
