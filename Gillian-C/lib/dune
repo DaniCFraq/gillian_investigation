@@ -1,0 +1,26 @@
+(menhir
+ (modules annot_parser)
+ (flags --explain))
+
+(ocamllex
+ (modules annot_lexer))
+
+(library
+ (name cgil_lib)
+ (public_name gillian-c.cgil_lib)
+ (libraries
+  gillian
+  gillian.alcotest-runner
+  compcert
+  printbox-text
+  gillian.ppx_sat.runtime
+  ppx_deriving_yojson.runtime
+  dune-site)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat))
+ (instrumentation
+  (backend landmarks --auto)))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites gillian-c))

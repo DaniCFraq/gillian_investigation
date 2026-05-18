@@ -1,0 +1,7 @@
+[FORMULA:sat.smt_input] (! (#gen__0 == #gen__1))
+[FORMULA:sat.smt_input] (0. <= #gen__0)
+[FORMULA:sat.smt_input] (0. <= #gen__1)
+[FORMULA:entailment.smt_input] (((#gen__0 + #gen__1) < #gen__0) or ((#gen__0 + #gen__1) < #gen__1))
+[FORMULA:entailment.smt_input] (0. <= #gen__0)
+[FORMULA:entailment.smt_input] (! (#gen__0 == #gen__1))
+[FORMULA:entailment.smt_input] (0. <= #gen__1)

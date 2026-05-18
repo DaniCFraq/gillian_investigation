@@ -1,0 +1,24 @@
+(library
+ (name debugger_lifter)
+ (public_name gillian.debugger_lifter)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson lwt_ppx))
+ (libraries
+  utils
+  gil_syntax
+  sedap.types
+  debugger_log
+  debugger_utils
+  parserAndCompiler)
+ (flags
+  :standard
+  -open
+  Debugger_utils
+  -open
+  Gil_syntax
+  -open
+  Engine
+  -open
+  Utils
+  -open
+  Utils.Prelude))

@@ -1,0 +1,3 @@
+pin-depends: [
+  ["compcert.~dev" "git+https://github.com/GillianPlatform/CompCert.git#312d268d484fe3834689e9db087449ff446fad3d"]
+]

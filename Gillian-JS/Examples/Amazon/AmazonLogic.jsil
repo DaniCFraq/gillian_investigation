@@ -1,0 +1,594 @@
+(*************************************
+ *************************************
+ *******                       *******
+ *******   Objects-as-Tables   *******
+ *******                       *******
+ *************************************
+ *************************************)
+
+(* Object properties as a table *)
+pred ObjectTableStructure(+l:Obj, +PVPairs:List) :
+    (* Base case - no properties left *)
+    (PVPairs == {{ }}),
+
+    (* Recursive case - one property and the rest *)
+    (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
+    DataProp(l, #prop, #value) * types(#value : Str) *
+    ObjectTableStructure(l, #restPVPairs);
+
+(* Complete Object-as-Table predicate *)
+nounfold pred ObjectTable(+l:Obj, +PVPairs:List) :
+    ObjectTableStructure(l, PVPairs) *
+    FirstProj(PVPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    empty_fields(l : #pSet);
+
+(* Object-as-Table absent property *)
+lemma ObjectTableAbsentProperty(l, PVPairs, prop)
+[[
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    empty_fields(l : #pSet) *
+    (! (#prop --e-- #pSet))
+]]
+[[
+    ObjectTableStructure(#l, #PVPairs) *
+    ((#l, #prop) -> none) *
+    empty_fields(#l : -u- (#pSet, -{ #prop }-))
+]]
+[*  *]
+
+(* Removing a property from a list of prop-value pairs *)
+pred RemoveProp(+PVPairs : List, +prop : Str, found : Bool, value : Str, newPairs : List) :
+    (PVPairs == {{ }}) * (found == false) * (value == "") * (newPairs == {{ }}),
+
+    (PVPairs == {{ prop, value }} :: newPairs) * (found == true),
+
+    (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, false, value, newPairs) *
+    (found == false),
+
+    (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, true, value, #restNewPairs) *
+    (found == true) * (newPairs == {{ #fstProp, #fstValue }} :: #restNewPairs);
+
+(* Object-as-Table present property *)
+lemma ObjectTablePresentProperty(l, PVPairs, prop)
+[[
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    (#prop --e-- #pSet)
+]]
+[[
+    RemoveProp(#PVPairs, #prop, true, #value, #newPairs) *
+    ObjectTableStructure(#l, #newPairs) *
+    DataProp(#l, #prop, #value) * types(#value : Str)
+]]
+[*
+    unfold ObjectTableStructure(#l, #PVPairs);
+    if (#PVPairs = {{ }}) then {
+        unfold FirstProj(#PVPairs, #pList);
+        unfold ListToSet(#pList, #pSet)
+    } else {
+        sep_assert (#PVPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (ObjectTableStructure(#l, #restPVPairs));
+        if (not (#fProp = #prop)) then {
+            unfold FirstProj(#PVPairs, #pList);
+            unfold ListToSet(#pList, #pSet);
+            apply ObjectTablePresentProperty(#l, #restPVPairs, #prop)
+        }
+    }
+ *]
+
+(* Appending property to Object-as-Table structure from the right *)
+lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
+[[
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    (! (#prop --e-- #pSet)) *
+    DataProp(#l, #prop, #value) * types(#value : Str)
+]]
+[[
+    ObjectTableStructure(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
+]]
+[*
+    unfold ObjectTableStructure(#l, #PVPairs);
+    if (not (#PVPairs = {{ }})) then {
+        sep_assert (#PVPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (ObjectTableStructure(#l, #restPVPairs));
+        unfold FirstProj(#PVPairs, #pList);
+        unfold ListToSet(#pList, #pSet);
+        apply ObjectTableStructureAppendPVPair(#l, #restPVPairs, #prop, #value);
+        sep_assert(True)
+    }
+ *]
+
+(* Appending property to Object-as-Table from the right *)
+lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
+[[
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    (! (#prop --e-- #pSet)) *
+    DataProp(#l, #prop, #value) * types(#value : Str) *
+    empty_fields(l : -u- (#pSet, -{ #prop }-))
+]]
+[[
+    ObjectTable(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
+]]
+[*
+    apply FirstProjAppendPair(#PVPairs, #pList, #prop, #value);
+    apply ListToSetAddElement(#pList, #pSet, #prop);
+    apply ObjectTableStructureAppendPVPair(#l, #PVPairs, #prop, #value)
+ *]
+
+(* Frozen object properties *)
+pred FrozenObjectTableStructure(+l:Obj, +PVPairs:List) :
+    (* Base case - no properties left *)
+    (PVPairs == {{ }}),
+
+    (* Recursive case - one property and the rest *)
+    (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
+    DataPropConst(l, #prop, #value, true) *
+    FrozenObjectTableStructure(l, #restPVPairs);
+
+(* Frozen Object-as-Table predicate *)
+nounfold pred FrozenObjectTable(+l:Obj, +PVPairs:List) :
+    FrozenObjectTableStructure(l, PVPairs) *
+    FirstProj(PVPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    empty_fields(l : #pSet);
+
+(******************************
+ ******************************
+ *******                *******
+ *******   Encryption   *******
+ *******   Context      *******
+ *******                *******
+ ******************************
+ ******************************)
+
+(* Live decoded encryption context *)
+pred LiveDecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
+    JSObjWithProto(dECObj, null) *
+    toUtf8PairMap(ECKs, #utf8ECKs) *
+    ObjectTable(dECObj, #utf8ECKs);
+
+(* Decoded encryption context *)
+pred DecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
+    JSObjGeneral(dECObj, null, "Object", false) *
+    toUtf8PairMap(ECKs, #utf8ECKs) *
+    FrozenObjectTable(dECObj, #utf8ECKs);
+
+(*****************************
+ *****************************
+ *******               *******
+ *******   Encrypted   *******
+ *******   Data Keys   *******
+ *******               *******
+ *****************************
+ *****************************)
+
+(***** EDK objects *****)
+
+(* Prototype of EDK objects *)
+pred EDKPrototype () :
+    JSObjGeneral($l_edk_proto, null, "Object", false) *
+    empty_fields($l_edk_proto: -{ }-);
+
+(* EDK objects *)
+nounfold pred EncryptedDataKey(+EDK, pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
+    JSObjGeneral(EDK, $l_edk_proto, "Object", false) *
+    readOnlyProperty(EDK, "providerId", pId) *
+    readOnlyProperty(EDK, "providerInfo", pInfo) *
+    readOnlyProperty(EDK, "encryptedDataKey", #aEDK) *
+        Uint8Array(#aEDK, #abEDK, 0, #viewSizeEDK) *
+        ArrayBuffer(#abEDK, encryptedDataKey) *
+        (#viewSizeEDK == l-len encryptedDataKey) *
+    readOnlyProperty(EDK, "rawInfo", #aRInfo) *
+        Uint8Array(#aRInfo, #abRInfo, 0, #viewSizeRInfo) *
+        ArrayBuffer(#abRInfo, rawInfo) *
+        (#viewSizeRInfo == l-len rawInfo);
+
+(***** Arrays of deserialised EDKs *****)
+
+(* Live array of deserialised EDKs *)
+pred ArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
+    (contents == {{ }}) * (contentsLength == 0),
+
+    (#index == num_to_string start) *
+    DataProp(a, #index, #edk) *
+    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    (#element == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
+    (contents == l+ ({{ #element }},  #rest)) *
+    (#rest_start == start + 1) *
+    ArrayOfDEDKsContents(a, #rest, #rest_start);
+
+(* Frozen array of deserialised EDKs *)
+pred FrozenArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
+    (contents == {{ }}) * (contentsLength == 0),
+
+    (#index == num_to_string start) *
+    readOnlyProperty(a, #index, #edk) *
+    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    (#edk == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
+    (contents == l+ ({{ #edk }}, #rest_contents)) *
+    (#rest_start == start + 1) *
+    FrozenArrayOfDEDKsContents(a, #rest_contents, #rest_start);
+
+(***** Deserialised EDKs *****)
+
+(* EDKs are first deserialised into a live array *)
+pred LiveDeserialisedEncryptedDataKeys (+a:Obj, EDKs:List) :
+    ArrayStructure(a, l-len EDKs) *
+    ArrayOfDEDKsContents(a, EDKs, 0);
+
+(* Deserialised EDKs are ultimately provided as a frozen array *)
+pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
+    FrozenArrayStructure(a, l-len contents) *
+    FrozenArrayOfDEDKsContents(a, contents, 0);
+
+(***************************
+ ***************************
+ *******             *******
+ *******   Message   *******
+ *******   Header    *******
+ *******             *******
+ ***************************
+ ***************************)
+
+(* Deserialised main part of the message header *)
+nounfold pred MessageHeader(+messageHeader, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength, frameLength) :
+    JSObject(messageHeader) *
+    DataProp(messageHeader, "version", version) *
+    DataProp(messageHeader, "type", type) *
+    DataProp(messageHeader, "suiteId", suiteId) *
+    DataProp(messageHeader, "messageId", #ui8aMessageId) *
+        Uint8Array(#ui8aMessageId, #abMessageId, 0, 16) *
+        ArrayBuffer(#abMessageId, messageId) *
+    DataProp(messageHeader, "encryptionContext", #dECObj) *
+        DecodedEncryptionContext(#dECObj, ECKs) *
+    DataProp(messageHeader, "encryptedDataKeys", #dEDKs) *
+        DeserialisedEncryptedDataKeys(#dEDKs, EDKs) *
+    DataProp(messageHeader, "contentType", contentType) *
+    DataProp(messageHeader, "headerIvLength", headerIvLength) *
+    DataProp(messageHeader, "frameLength", frameLength);
+
+(* Entire deserialised header *)
+nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength,
+                            frameLength, headerLength, rawHeaderData, headerIv, headerAuthTag) :
+    JSObject(headerInfo) *
+    DataProp(headerInfo, "messageHeader", #messageHeader) *
+        MessageHeader(#messageHeader, version, type, suiteId, messageId, ECKs, EDKs, contentType, headerIvLength, frameLength) *
+    DataProp(headerInfo, "headerLength", headerLength) *
+    DataProp(headerInfo, "algorithmSuite", #algoSuiteObject) *
+        AlgorithmSuiteObject(#algoSuiteObject, headerIvLength, #tagLength) *
+    DataProp(headerInfo, "rawHeader", #rawHeader) *
+        Uint8Array(#rawHeader, #rawBuffer, 0, headerLength) *
+        ArrayBuffer(#rawBuffer, rawHeaderData) *
+    DataProp(headerInfo, "headerIv", #ui8aHeaderIv) *
+        Uint8Array(#ui8aHeaderIv, #abHeaderIv, 0, headerIvLength) *
+        ArrayBuffer(#abHeaderIv, headerIv) *
+    DataProp(headerInfo, "headerAuthTag", #ui8aHeaderAuthTag) *
+        Uint8Array(#ui8aHeaderAuthTag, #abHeaderAuthTag, 0, #tagLength / 8) *
+        ArrayBuffer(#abHeaderAuthTag, headerAuthTag);
+
+(******************************
+ ******************************
+ *******                *******
+ *******   Additional   *******
+ *******   Internal/    *******
+ *******   Built-in     *******
+ *******   Functions    *******
+ *******                *******
+ ******************************
+ ******************************)
+
+(* *** Array.prototype.map *** *)
+axiomatic incomplete spec AP_map (xsc, vthis, cfun)
+(* Mapping EDKs into the resulting decoded EDK array *)
+[[
+    (vthis == #vthis) * (cfun == #cfun) *
+    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs)
+]]
+[[
+    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs) *
+    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret, #EDKs)
+]]
+normal
+
+(* *** Object.freeze *** *)
+axiomatic spec Object_freeze(xsc, vthis, l)
+(* Freezing an array of deserialised EDKs *)
+<deserialised_EDKS>
+[[
+    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs)
+]]
+[[
+    DeserialisedEncryptedDataKeys(#l, #EDKs) * (ret == #l)
+]]
+normal;
+
+(* Freezing an Object-as-Table *)
+<object_table : #PVPairs>
+[[
+    (l == #l) *
+    JSObjGeneral(#l, #proto, #class, #ext) *
+    ObjectTable(#l, #PVPairs)
+]]
+[[
+    JSObjGeneral(#l, #proto, #class, false) *
+    FrozenObjectTable(#l, #PVPairs)
+]]
+normal
+
+(* *** Conversion to an integer *** *)
+proc i__toInteger (v) {
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_int (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** Conversion to a 32-bit integer *** *)
+proc i__toUint32 (v) {
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_uint32 (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** Conversion to an array length *** *)
+proc i__toLength (v) {
+
+		   ret := "i__toInteger"(v) with elab;
+		   goto [ret <= 0] rlab nzero;
+
+	nzero: goto [ret <= 9007199254740991] min rlab;
+    min:   return;
+
+
+	rlab: PHI(ret: 0, 9007199254740991);
+          return;
+
+	elab: throw
+};
+
+(* *** Is a string an array index *** *)
+proc a__isIdx (s) {
+			ret := "i__toUint32" (s) with elab;
+			ret := "i__toString" (ret) with elab;
+
+			goto [ret = s] check ret_f;
+
+	check:	ret := not (ret = "4294967295");
+			goto rlab;
+
+	ret_f:	ret := false;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** Array defineOwnProperty *** *)
+proc a__defineOwnProperty (l, prop, desc, thrw) {
+
+			oldLenDesc := "getOwnProperty" (l, "length");
+			oldLen := l-nth (oldLenDesc, 1);
+			ret := "i__toUint32" (oldLen) with elab;
+			oldLenNum := ret;
+
+			goto [prop = "length"] getall is_idx;
+
+	is_idx:	idxp := "a__isIdx" (prop);
+			goto [idxp] idx norm;
+
+	idx:	index := "i__toUint32" (prop);
+			index := index;
+			oldLen := oldLen;
+			ret := l-nth (oldLenDesc, 2);
+			goto [(not (index < oldLenNum)) and (not (l-nth (oldLenDesc, 2)))] reject idop;
+	idop:	ret := "o__defineOwnProperty" (l, prop, desc, false) with elab;
+			goto [ret = false] reject ilen;
+	ilen:	goto [not (index < oldLenNum)] setl rlab;
+	setl:	ret := "o__defineOwnProperty" (l, "length", {{ "d", (index + 1), l-nth (oldLenDesc, 2), l-nth (oldLenDesc, 3), l-nth (oldLenDesc, 4) }}, false);
+			goto rlab;
+
+	norm:	ret := "o__defineOwnProperty" (l, prop, desc, thrw) with elab;
+			goto rlab;
+
+	getall:	goto [l-nth (desc, 0) = "d"] ddd odd;
+
+			(* Data *)
+	ddd:	de := l-nth (desc, 3);
+			dc := l-nth (desc, 4);
+			dv := l-nth (desc, 1);
+			dw := l-nth (desc, 2);
+			dg := empty;
+			ds := empty;
+			goto sla;
+
+	odd:	goto [l-nth (desc, 0) = "a"] add gdd;
+
+			(* Accessor *)
+	add:	de := l-nth (desc, 3);
+			dc := l-nth (desc, 4);
+			dv := empty;
+			dw := empty;
+			dg := l-nth (desc, 1);
+			ds := l-nth (desc, 2);
+			goto sla;
+
+			(* Generic *)
+	gdd:	de := l-nth (desc, 1);
+			dc := l-nth (desc, 2);
+			dv := l-nth (desc, 3);
+			dw := l-nth (desc, 4);
+			dg := l-nth (desc, 5);
+			ds := l-nth (desc, 6);
+
+	sla:	goto [dv = empty] slai slb;
+
+	slai:	ret := "o__defineOwnProperty" (l, "length", desc, thrw) with elab;
+			goto rlab;
+
+	slb:	ret := "i__toUint32" (dv) with elab;
+			newLen := ret;
+			ret := "i__toNumber" (dv) with elab;
+			goto [not (newLen = ret)] rgerr sle;
+
+	sle:	dv := newLen;
+			goto [not (newLen < oldLenNum)] slfi slg;
+
+	slfi:	ret := "o__defineOwnProperty" (l, "length", {{ "g", de, dc, dv, dw, dg, ds }}, thrw) with elab;
+			goto rlab;
+
+	slg:	goto [l-nth (oldLenDesc, 2) = false] reject slh;
+
+	slh:	goto [dw = false] sli slh1;
+
+	slh1:	newWritable := true;
+			goto slj;
+
+	sli:	newWritable := false;
+			dw := true;
+
+	slj:	ret := "o__defineOwnProperty" (l, "length", {{ "g", de, dc, dv, dw, dg, ds }}, thrw) with elab;
+			goto [ret = false] tf loop;
+
+	loop:	goto [newLen < oldLen] head slm;
+	head:	oldLen := oldLen - 1;
+			ret := "i__toString" (oldLen) with elab;
+			ret := "deleteProperty" (l, ret, false) with elab;
+			goto [ret = false] fix next;
+
+	fix:	dv := oldLen + 1;
+			goto [newWritable = false] setwr defl;
+	setwr:	dw := false;
+	defl:	ret := "o__defineOwnProperty" (l, "length", {{ "g", de, dc, dv, dw, dg, ds }}, thrw) with elab;
+			goto reject;
+
+	next:	goto loop;
+
+	slm:	goto [newWritable = false] slmi sln;
+
+	slmi:	ret := "o__defineOwnProperty" (l, "length", {{ "g", empty, empty, empty, false, empty, empty }}, false) with elab;
+
+	sln:	ret := true;
+	rlab: return;
+
+	rgerr:	ret := "RangeError" ();
+			goto elab;
+
+	reject:	goto [thrw] tt tf;
+
+	tt:		ret := "TypeError" ();
+	elab: throw;
+
+	tf:		ret := false;
+			goto rlab
+};
+
+(* *** Array constructor *** *)
+proc Array_construct (xsc, vthis) {
+            (* Default array construction *)
+            array := "create_default_object" ($larr_proto, "Array", true);
+            [array, "length"] := {{ "d", 0, true, false, true }};
+
+            (* All runtime arguments *)
+            arguments := args;
+            (* Optional arguments (4) *)
+            opt_args := cdr (cdr arguments);
+            len := l-len (opt_args);
+            goto [len = 0] rlab ltest;
+  ltest:    goto [len = 1] arr_a arr_b;
+
+            (* Form 4(a): new Array(len) *)
+  arr_a:    len := l-nth (opt_args, 0);
+            prop_name := "length";
+            prop_num := "0";
+            goto [typeOf len = Num] check set;
+  check:    len_32 := "i__toUint32" (len) with elab;
+            goto [len = len_32] set thrw;
+
+  set:      PHI(prop_a: prop_num, prop_name; enum: true, false);
+            ret_def_a := "a__defineOwnProperty" (array, prop_a, {{ "d", len, true, enum, true }}, true) with elab;
+            goto rlab;
+
+            (* Form 4(b): new Array([item1 [, item2 [, ...]]] *)
+  arr_b:    start_n := 0;
+  loop:	    PHI(n: start_n, next_n);
+            goto [n < len] head rlab;
+  head:     prop_b := "i__toString" (n) with elab;
+            prop_val := l-nth (opt_args, n);
+            ret_def_b := "a__defineOwnProperty" (array, prop_b, {{ "d", prop_val, true, true, true }}, true) with elab;
+            next_n := n + 1;
+            goto loop;
+
+            (* Normal return *)
+  rlab:	    ret := array;
+            return;
+
+            (* Error return *)
+  thrw:     range_err := "RangeError" ();
+  elab:     PHI(ret: len_32, ret_def_a, prop, ret_def_b, range_err);
+            throw
+};
+
+(* *** Array.prototype.map implementation *** *)
+proc AP_map(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
+
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
+
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] cont thrw;
+
+          (* Check if optional thisArg is supplied at runtime *)
+  cont:	  undef_t := undefined;
+          goto [num > 3] def set_t;
+  def:    def_t := l-nth (arguments, 3);
+  set_t:  PHI(t: undef_t, def_t);
+
+          new_arr := "Array_construct" (empty, empty, len) with elab;
+
+          (* Loop start *)
+          start := 0;
+  loop:	  PHI(k: start, next_k);
+          goto [k < len] next end;
+
+  next:	  pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
+
+  tt:     kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          mapv := fun (scp, t, kval, k, arr_obj) with elab;
+          ret_def := "a__defineOwnProperty" (new_arr, pk, {{ "d", mapv, true, true, true }}, false) with elab;
+
+  ff:     next_k := k + 1;
+          goto loop;
+          (* Loop end *)
+          (* Normal/ return *)
+  end:    ret := new_arr;
+          return;
+
+          (* Error return *)
+  thrw:   type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, new_arr, pk, kpres, kval, mapv, ret_def, type_err);
+          throw
+};

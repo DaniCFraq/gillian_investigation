@@ -1,0 +1,6 @@
+(library
+ (name debugger_log)
+ (public_name gillian.debugger_log)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson lwt_ppx))
+ (libraries sedap.rpc sedap.types logging utils))

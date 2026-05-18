@@ -1,0 +1,8 @@
+(library
+ (name javert_utils)
+ (public_name gillian-js.javert_utils)
+ (libraries gillian dune-site))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites gillian-js))

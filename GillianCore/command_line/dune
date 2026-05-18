@@ -1,0 +1,32 @@
+(library
+ (name command_line)
+ (public_name gillian.command_line)
+ (libraries
+  cmdliner
+  fmt.tty
+  gil_syntax
+  utils
+  usage_logs
+  engine
+  bulk
+  logging
+  debugger_lifter
+  incrementalAnalysis
+  debug_adapter
+  memtrace
+  linol
+  linol-lwt)
+ (preprocess
+  (pps ppx_deriving.std))
+ (flags
+  :standard
+  -open
+  Gil_syntax
+  -open
+  Utils
+  -open
+  Engine
+  -open
+  Bulk
+  -open
+  IncrementalAnalysis))

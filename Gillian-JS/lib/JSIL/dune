@@ -1,0 +1,7 @@
+(library
+ (name jsil_syntax)
+ (public_name gillian-js.jsil_syntax)
+ (libraries gillian)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
+ (flags :standard -open Utils -open Gillian.Utils))

@@ -1,0 +1,56 @@
+OCAML_VARIANT=ocaml-variants.5.3.0+options
+DEV_PACKAGES=ocaml-lsp-server
+BUILD_PACKAGES=ocamlformat.0.27.0,odoc
+ifeq ($(NO_OPAM_EXEC),)
+	OPAM_EXEC = opam exec --
+else
+	OPAM_EXEC =
+endif
+
+build:
+	$(OPAM_EXEC) dune build @all
+
+fmt:
+	$(OPAM_EXEC) dune fmt
+
+opam:
+	$(OPAM_EXEC) dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam gillian-c2.opam transformers.opam
+
+deps:
+	make opam
+	opam install . -y --deps-only
+
+switch:
+	opam switch create . --packages=${OCAML_VARIANT},${BUILD_PACKAGES},${DEV_PACKAGES} -y --deps-only
+
+githooks:
+	./githooks/install
+
+init-dev:
+	make switch
+	make githooks
+
+init-ci:
+	opam install . -y --deps-only
+	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y
+
+uninstall:
+	opam remove gillian gillian-c gillian-js wisl gillian-c2 transformers -y
+
+watch:
+	$(OPAM_EXEC) dune build --watch
+
+c-init-env:
+	./Gillian-C/scripts/setup_environment.sh
+
+wisl-init-env:
+	./wisl/scripts/setup_environment.sh
+
+js-init-env:
+	./Gillian-JS/scripts/setup_environment.sh
+
+docs:
+	$(OPAM_EXEC) dune build @doc
+	$(OPAM_EXEC) odoc html-generate --as-json -o _docs ./_build/default/_doc/_odocls/gillian/gillian.odocl
+
+.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs githooks switch deps opam

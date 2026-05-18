@@ -1,0 +1,11 @@
+(executables
+ (names wisl wislf)
+ (public_names wisl wislf)
+ (package wisl)
+ (libraries
+  gillian
+  wStateEx
+  wStateFrac
+  wStateConcrete
+  wParserAndCompiler
+  wUtils))

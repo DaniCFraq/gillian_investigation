@@ -1,0 +1,19 @@
+(library
+ (name gillian)
+ (public_name gillian)
+ (libraries
+  engine
+  utils
+  gil_syntax
+  gil_parsing
+  command_line
+  bulk
+  ;gillian_bulk_rely
+  parserAndCompiler
+  logging
+  incrementalAnalysis
+  monadic
+  debugger
+  debugger_log
+  debugger_utils
+  debugger_lifter))
