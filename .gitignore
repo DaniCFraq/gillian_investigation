@@ -56,7 +56,7 @@ racket/compiled
 *.bbl
 *.aux
 *.out
-*.log
+file.log
 *.log.zip
 /*.gil
 tutorial/main.pdf
