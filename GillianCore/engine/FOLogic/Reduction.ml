@@ -8,6 +8,8 @@ exception ReductionException of Expr.t * string
    required for the GIL execution model (l-nth on concrete lists, base cases)
    are applied.  The tool still works correctly; Z3 just receives unsimplified
    assertions, which is what we want to measure. *)
+
+(*TODO : remove this old*)
 let enable_reductions = ref true
 
 let set_reductions_enabled (enabled : bool) : unit =
@@ -20,7 +22,14 @@ let disabled_reductions : int list ref = ref []
 let disable_reductions (ns : int list ) =
     disabled_reductions := ns
 
-let () = disable_reductions [158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001]
+(* normal *)
+(* let () = disable_reductions [] *)
+
+(* SLL_iterative.wisl *)
+let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ]
+
+(* simple_example.js *)
+(* let () = disable_reductions [ 158; 156; 149; 146; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ] *)
 
 exception ReductionDisabled 
 
@@ -2029,28 +2038,28 @@ and reduce_lexpr_loop
         let flel, fler, exn =
           try (f lel, f ler, false) with
           | ReductionException _ when op = Or || op = And ->
-              L.normal (fun m -> m "[REDUCE_140_a]");
+              check_reduction 140_01;
               (Expr.false_, Expr.false_, true)
-          | exn -> L.normal (fun m -> m "[REDUCE_140_b]"); raise exn
+          | exn -> check_reduction 140_02; raise exn
         in
         let- () = if exn then Some Expr.false_ else None in
         let def = Expr.BinOp (flel, op, fler) in
         let- () =
           match (flel, fler) with
           | (Lit _ as ll), (Lit _ as lr) -> (
-              L.normal (fun m -> m "[REDUCE_140_c]");
+              check_reduction 140_03;
               try
                 let lit = CExprEval.evaluate_binop (CStore.init []) op ll lr in
                 Some (Expr.Lit lit)
               with
               | CExprEval.TypeError err_msg ->
-                  L.normal (fun m -> m "[REDUCE_140_d]");
+                  check_reduction 140_04;
                   raise (ReductionException (def, err_msg))
               | CExprEval.EvaluationError err_msg ->
-                  L.normal (fun m -> m "[REDUCE_140_e]");
+                  check_reduction 140_05;
                   raise (ReductionException (def, err_msg))
-              | e -> L.normal (fun m -> m "[REDUCE_140_f]"); raise e)
-          | _ -> L.normal (fun m -> m "[REDUCE_140_g]"); None
+              | e -> check_reduction 140_06; raise e)
+          | _ -> check_reduction 140_07; None
         in
         let- () =
           reduce_binop_inttonum_const matching reduce_lvars pfs gamma flel fler
