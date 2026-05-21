@@ -23,10 +23,10 @@ let disable_reductions (ns : int list ) =
     disabled_reductions := ns
 
 (* normal *)
-(* let () = disable_reductions [] *)
+let () = disable_reductions []
 
 (* SLL_iterative.wisl *)
-let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ]
+(* let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ] *)
 
 (* simple_example.js *)
 (* let () = disable_reductions [ 158; 156; 149; 146; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ] *)

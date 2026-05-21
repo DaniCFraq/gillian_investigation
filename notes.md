@@ -76,3 +76,29 @@ dune exec -- wisl verify "filename" > "out filename" 2>&1
 if [[ -f file.log ]]; then grep '^\[REDUCE' file.log | awk '!seen[$0]++' > reduce_unique.log; echo "lines: $(wc -l < reduce_unique.log)"; else echo 'file.log not found'; fi
 
 reduce_unique.log being the output file
+
+## Simplificações usadas no SLL_iterative.wisl
+001, 002, 003, 004, 010, 011, 013, 023, 026, 027, 028, 030, 031, 033, 040, 042, 043, 048, 051, 052, 054, 056, 057, 060, 089, 100, 102, 110, 120, 140, 141, 142, 144, 146, 149, 150, 156, 158
+
+necessárias: 023, 028, 033, 040, 043, 048, 089, 110, 120, 140, 141, 144, 150
+
+
+# Notas: 
+* quando tiramos a 011, o programa fica mais rápido.
+* 013 está interligada com a 011, ou seja, não podemos ativar 013 e deixar 011 desativada. 013 ativa implica 011 ativa
+
+
+# Tempos com 500 repetições:
+
+Simplificações desativadas:
+Results
+Average: 1.578503
+Maximum: 1.884486
+Minimum: 1.483289
+
+Simplificações ativadas:
+Results
+Average: 1.333561
+Maximum: 1.471511
+Minimum: 1.245433
+
