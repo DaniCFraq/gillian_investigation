@@ -77,6 +77,10 @@ if [[ -f file.log ]]; then grep '^\[REDUCE' file.log | awk '!seen[$0]++' > reduc
 
 reduce_unique.log being the output file
 
+# Getting what enters in the SMT
+
+GILLIAN_TRACE_FORMULAS=true dune exec -- wisl verify "filename" > "out_filename" 2>&1
+
 ## Simplificações usadas no SLL_iterative.wisl
 001, 002, 003, 004, 010, 011, 013, 023, 026, 027, 028, 030, 031, 033, 040, 042, 043, 048, 051, 052, 054, 056, 057, 060, 089, 100, 102, 110, 120, 140, 141, 142, 144, 146, 149, 150, 156, 158
 
