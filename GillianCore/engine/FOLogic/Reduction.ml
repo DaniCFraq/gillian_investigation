@@ -3,33 +3,18 @@
 (* When reduction fails *)
 exception ReductionException of Expr.t * string
 
-(* COMPARISON STUDY: Global flag to disable SMT-optimisation reductions for
-   performance testing.  When false, only the minimal structural reductions
-   required for the GIL execution model (l-nth on concrete lists, base cases)
-   are applied.  The tool still works correctly; Z3 just receives unsimplified
-   assertions, which is what we want to measure. *)
-
-(*TODO : remove this old*)
-let enable_reductions = ref true
-
-let set_reductions_enabled (enabled : bool) : unit =
-  enable_reductions := enabled
-
-let is_reductions_enabled () : bool =
-  !enable_reductions
-
 let disabled_reductions : int list ref = ref []
 let disable_reductions (ns : int list ) =
     disabled_reductions := ns
 
 (* normal *)
-let () = disable_reductions []
+(* let () = disable_reductions [] *)
 
 (* SLL_iterative.wisl *)
-(* let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ] *)
+let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ]
 
 (* simple_example.js *)
-(* let () = disable_reductions [ 158; 156; 149; 146; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ] *)
+(* let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ] *)
 
 exception ReductionDisabled 
 
@@ -838,21 +823,6 @@ module Cnum = Canonical.Make (struct
     | _ -> e
 end)
 
-(* Minimal structural reductions that MUST always run regardless of
-   [enable_reductions] *)
- (* let rec reduce_lexpr_minimal
-    ?(fuel = 20)
-    (pfs : PFS.t)
-    (gamma : Type_env.t)
-    (le : Expr.t) : Expr.t =
-  let f =
-    if fuel <= 0 then Fun.id
-    else reduce_lexpr_minimal ~fuel:(fuel - 1) pfs gamma
-  in
-  match le with
-  (* ---- 0. Base cases — identity ---------------------------------------- *)
-  | Lit _ | PVar _ | ALoc _ | LVar _ -> L.normal (fun m -> m "[MIN_001]"); le
-   *)
 let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : Cint.t list =
   let llen_expr = Expr.UnOp (LstLen, e) in
   let found_lengths =
@@ -912,8 +882,6 @@ and reduce_lexpr_loop
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (le : Expr.t) =
-   if not (is_reductions_enabled ()) then (* reduce_lexpr_minimal pfs gamma *) le
-  else
   let f =
     if fuel <= 0 then Fun.id
     else reduce_lexpr_loop ~matching ~reduce_lvars ~fuel:(fuel - 1) pfs gamma
@@ -2361,7 +2329,6 @@ and reduce_lexpr
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (le : Expr.t) =
-   if not (is_reductions_enabled ()) then (* reduce_lexpr_minimal pfs gamma*)  le else
   (* let t = Sys.time () in *)
   let result = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma le in
   (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)

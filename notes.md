@@ -92,17 +92,4 @@ necessárias: 023, 028, 033, 040, 043, 048, 089, 110, 120, 140, 141, 144, 150
 * 013 está interligada com a 011, ou seja, não podemos ativar 013 e deixar 011 desativada. 013 ativa implica 011 ativa
 
 
-# Tempos com 500 repetições:
-
-Simplificações desativadas:
-Results
-Average: 1.578503
-Maximum: 1.884486
-Minimum: 1.483289
-
-Simplificações ativadas:
-Results
-Average: 1.333561
-Maximum: 1.471511
-Minimum: 1.245433
-
+# Times for 100 repetitions:

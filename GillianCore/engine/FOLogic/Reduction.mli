@@ -2,13 +2,6 @@
     expression [e] being malformed with explanation [msg] *)
 exception ReductionException of Gil_syntax.Expr.t * string
 
-(** COMPARISON STUDY: Enable or disable formula reductions.
-    Set to false to skip simplifications before SMT solving for performance testing. *)
-val set_reductions_enabled : bool -> unit
-
-(** Check if reductions are currently enabled *)
-val is_reductions_enabled : unit -> bool
-
 (** [resolve_to_location pfs e] attempts to resolve the expression denoted by
     [e] to a location given the pure formulae [pfs]. If successful, it returns
     that location, together with any bindings learned during the resolution. *)
