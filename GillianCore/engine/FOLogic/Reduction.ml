@@ -7,6 +7,81 @@ let disabled_reductions : int list ref = ref []
 let disable_reductions (ns : int list ) =
     disabled_reductions := ns
 
+module L = Logging
+
+let reduction_source_file = "GillianCore/engine/FOLogic/Reduction.ml"
+
+let reduction_source_lines =
+  lazy
+    (try
+       let channel = open_in reduction_source_file in
+       let rec read_lines acc =
+         match input_line channel with
+         | line -> read_lines (line :: acc)
+         | exception End_of_file ->
+             close_in_noerr channel;
+             Array.of_list (List.rev acc)
+       in
+       read_lines []
+     with _ -> [||])
+
+let rec find_substring haystack needle index =
+  let haystack_len = String.length haystack in
+  let needle_len = String.length needle in
+  if index + needle_len > haystack_len then None
+  else if String.sub haystack index needle_len = needle then Some index
+  else find_substring haystack needle (index + 1)
+
+let is_reduction_tag_char = function
+  | '0' .. '9' | '_' -> true
+  | _ -> false
+
+let reduction_tag_from_line line =
+  match find_substring line "check_reduction" 0 with
+  | None -> None
+  | Some pos ->
+      let start = pos + String.length "check_reduction" in
+      let rec skip_spaces idx =
+        if idx < String.length line then
+          match line.[idx] with
+          | ' ' | '\t' -> skip_spaces (idx + 1)
+          | _ -> idx
+        else idx
+      in
+      let start = skip_spaces start in
+      let rec scan_end idx =
+        if idx < String.length line && is_reduction_tag_char line.[idx] then
+          scan_end (idx + 1)
+        else idx
+      in
+      let finish = scan_end start in
+      if finish > start then Some (String.sub line start (finish - start)) else None
+
+let reduction_tag_from_callstack () =
+  match Printexc.backtrace_slots (Printexc.get_callstack 8) with
+  | None -> None
+  | Some slots ->
+      Array.fold_left
+        (fun acc slot ->
+          match acc with
+          | Some _ -> acc
+          | None -> (
+              match Printexc.Slot.location slot with
+              | Some loc
+                when Filename.basename loc.filename = "Reduction.ml"
+                     && loc.line_number > 100 ->
+                  let lines = Lazy.force reduction_source_lines in
+                  if loc.line_number - 1 < Array.length lines then
+                    reduction_tag_from_line lines.(loc.line_number - 1)
+                  else None
+              | _ -> None))
+        None slots
+
+let log_reduction (n : int) =
+  match reduction_tag_from_callstack () with
+  | Some tag -> L.normal (fun m -> m "[REDUCE_%s]" tag)
+  | None -> L.normal (fun m -> m "[REDUCE_%03d]" n)
+
 (* normal *)
 let () = disable_reductions []
 
@@ -19,9 +94,8 @@ let () = disable_reductions []
 exception ReductionDisabled 
 
 let check_reduction (n : int) =
-  if List.mem n !disabled_reductions then raise ReductionDisabled
-
-module L = Logging
+  if List.mem n !disabled_reductions then raise ReductionDisabled;
+  log_reduction n
 module CStore = Store.Make (CVal.M)
 
 let _256 = Z.of_int 256
