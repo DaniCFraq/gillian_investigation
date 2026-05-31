@@ -1,0 +1,29 @@
+Parsing and compiling...
+Preprocessing...
+Original Backtrace:
+Raised at Engine__Verifier.Make.get_tests_to_verify in file "GillianCore/engine/Abstraction/Verifier.ml", lines 767-768, characters 8-79
+Called from Engine__Verifier.Make.verify_procs in file "GillianCore/engine/Abstraction/Verifier.ml", line 862, characters 6-75
+Called from Engine__Verifier.Make.verify_prog.(fun) in file "GillianCore/engine/Abstraction/Verifier.ml", line 1022, characters 14-75
+Called from Logging.Phase.with_phase in file "GillianCore/logging/logging.ml", line 123, characters 13-19
+
+Analysis failures!
+1. Creation of matching plans for predicates failed:
+ MP failed for predicate SLLseg_len:
+types(#n : Int) * (0i i< #n)
+ [wisl/examples/SLL_ex_ongoing.wisl 58:1-61:2]
+
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.
+Warning: variants are not currently being used by Gillian, no termination is checked.

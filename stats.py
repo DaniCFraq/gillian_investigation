@@ -3,9 +3,9 @@ import re
 import sys
 
 compile_cmd = "dune build"
-command = "dune exec -- wisl verify wisl/examples/SLL_iterative.wisl > simple_example_trace.txt"
+command = "dune exec -- wisl verify wisl/examples/SLL_iterative.wisl > program_trace.txt"
 file = "GillianCore/engine/FOLogic/Reduction.ml"
-output = "simple_example_trace.txt"
+output = "program_trace.txt"
 N = 30
 
 line_to_replace = "let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ]"
