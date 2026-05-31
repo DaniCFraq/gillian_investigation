@@ -47,7 +47,7 @@ predicate SLL_len(+x, n : Int) {
   // Empty SLL
   (x == null) * (n == 0);
   // One SLL node and the rest
-  (x -b> #v, #y) * SLL_len(#y, n - 1)
+  (x -b> #v, #y) * SLL_len(#y, n - 1) * (0 < n)
 }
 
 //
@@ -57,7 +57,7 @@ predicate SLL_len(+x, n : Int) {
 // With length
 predicate SLLseg_len(+x, y, n : Int) {
   (x == y) * (n == 0);
-  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 < #n)
+  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 < n)
 }
 
 // With values
