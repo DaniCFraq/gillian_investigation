@@ -27,7 +27,7 @@ def clear_output_file():
 
 def make_run_cmd(wisl_path: str) -> str:
     
-    return f"dune exec -- wisl verify {wisl_path} > {output}"
+    return f"dune exec -- wisl verify {wisl_path} -l disabled > {output}"
 
 
 def process_simplifications(reductions_array):
