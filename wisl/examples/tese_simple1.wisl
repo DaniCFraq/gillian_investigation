@@ -1,5 +1,0 @@
-{ emp }
-function main() {
-	return 0
-}
-{ (ret == 0) }

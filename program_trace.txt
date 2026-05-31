@@ -2,15 +2,6 @@ Parsing and compiling...
 Preprocessing...
 Obtaining specs to verify...
 Obtaining lemmas to verify...
-Obtained 5 symbolic tests in total
-Running symbolic tests: 0.038972
-Verifying lemma empty_wand... s Success
-Verifying lemma pure_wand... s Success
-Verifying lemma pure_wand_fail... Failure
-Verifying lemma should_fail... Failure
-Verifying lemma should_succeed... s Success
-There were failures: 0.053255
-Analysis failures!
-1. Assertion failed for #x: (#x == 5i)
-2. Assertion failed for #lvar_34: ((typeOf #lvar_34) == List)
-
+Obtained 0 symbolic tests in total
+Running symbolic tests: 0.053061
+All specs succeeded: 0.053094
