@@ -21,13 +21,13 @@ original_line: str = line_to_replace
 RUN_TIMEOUT = 25
 
 
+def make_run_cmd(wisl_path: str, with_logging: bool = True) -> str:
+    log_flag = "" if with_logging else " -l disabled"
+    return f"dune exec -- wisl verify {wisl_path}{log_flag} > {output}"
+
 def clear_output_file():
     Path(output).write_text("")
-
-
-def make_run_cmd(wisl_path: str) -> str:
-    
-    return f"dune exec -- wisl verify {wisl_path} -l disabled > {output}"
+    Path("file.log").write_text("")   # also clear log before initial run
 
 
 def process_simplifications(reductions_array):
@@ -55,6 +55,8 @@ def restore_reduction_file():
     if new_content != content:
         with open(reduction_file, "w") as f:
             f.write(new_content)
+
+    Path("file.log").write_text("")
 
 
 def test_reductions(simplifications, run_cmd):
@@ -136,7 +138,8 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     global line_to_replace
     line_to_replace = original_line  # reset for each file
 
-    run_cmd = make_run_cmd(wisl_path)
+    run_cmd  = make_run_cmd(wisl_path, with_logging=True)
+    test_cmd = make_run_cmd(wisl_path, with_logging=False)
     print(f"\n{'='*60}")
     print(f"Processing: {wisl_path}")
     print(f"{'='*60}")
@@ -167,11 +170,12 @@ def process_wisl_file(wisl_path: str) -> dict | None:
         return {"file": wisl_path, "mandatory": [], "optional": []}
 
     reductions_array = sorted(set(matches))
+    Path("file.log").write_text("")
     processed_reductions = process_simplifications(reductions_array)
     print(f"  All simplifications found:     {processed_reductions}")
 
     # Test which ones are optional (can be disabled without breaking the run)
-    optional = test_reductions(processed_reductions, run_cmd)
+    optional = test_reductions(processed_reductions, test_cmd)
     mandatory = [r for r in processed_reductions if r not in optional]
 
     print(f"  Mandatory simplifications: {mandatory}")

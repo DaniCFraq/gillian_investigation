@@ -2,6 +2,28 @@ Parsing and compiling...
 Preprocessing...
 Obtaining specs to verify...
 Obtaining lemmas to verify...
-Obtained 0 symbolic tests in total
-Running symbolic tests: 0.053061
-All specs succeeded: 0.053094
+Obtained 22 symbolic tests in total
+Running symbolic tests: 0.741727
+Verifying lemma list_member_append... s s s s s s Success
+Verifying lemma list_member_concat... s s s Success
+Verifying lemma lseg_append... s s Success
+Verifying lemma lseg_concat_list... s s Success
+Verifying lemma lseg_to_list... s s Success
+Verifying one spec of procedure list_length... s Success
+Verifying one spec of procedure list_length_loop0... s s Success
+Verifying one spec of procedure list_reverse_loop0... s s Success
+Verifying one spec of procedure list_append_loop0... s s Success
+Verifying one spec of procedure list_free... s Success
+Verifying one spec of procedure list_append_node_loop0... s s Success
+Verifying one spec of procedure list_free_loop0... s s Success
+Verifying one spec of procedure list_reverse... s Success
+Verifying one spec of procedure list_copy... s s Success
+Verifying one spec of procedure list_allocate_node... s Success
+Verifying one spec of procedure list_concat_loop0... s s Success
+Verifying one spec of procedure list_member_loop0... s s s Success
+Verifying one spec of procedure list_member... s s Success
+Verifying one spec of procedure list_copy_loop0... s s Success
+Verifying one spec of procedure list_concat... s s Success
+Verifying one spec of procedure list_append_node... s s Success
+Verifying one spec of procedure list_append... s s Success
+All specs succeeded: 10.964703
