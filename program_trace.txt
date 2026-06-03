@@ -1,8 +1,31 @@
-Parsing and compiling...
-Preprocessing...
-Obtaining specs to verify...
-Obtaining lemmas to verify...
-Obtained 1 symbolic tests in total
-Running symbolic tests: 0.065520
-Verifying one spec of procedure tree_dispose... s s Success
-All specs succeeded: 0.109755
+Compilation time: 0.000562s
+Total time (Compilation + Symbolic testing): 0.002960s
+Errors occurred!
+Here's a counterexample: [  ]
+Here's an example of final error state: FAILURE TERMINATION: Procedure Memory Leak Check post-execution, Command -1 [wisl/examples/active_examples/double_free_error.wisl 5:12-16]
+                                        Errors: MemoryLeak
+                                        FINAL STATE:
+                                          SPEC VARS: 
+                                          STORE:
+                                            (gvar0: {{  }})
+                                            (ret: Lit null)
+                                            (x: {{ Lit #loc_0, Lit 0i }})
+                                          
+                                          MEMORY:
+                                            #loc_0 -> BOUND: 10
+                                                      {0i: 42i
+                                                       1i: null
+                                                       2i: null
+                                                       3i: null
+                                                       4i: null
+                                                       5i: null
+                                                       6i: null
+                                                       7i: null
+                                                       8i: null
+                                                       9i: null}
+                                          
+                                          PURE FORMULAE:
+                                            
+                                          
+                                          TYPING ENVIRONMENT:
+                                            

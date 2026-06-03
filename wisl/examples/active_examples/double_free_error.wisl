@@ -1,0 +1,9 @@
+{ true }
+function main() {
+    x := new(10);
+    [x] := 42;
+    free(x);
+    free(x);
+    return null
+}
+{ (ret == null) }

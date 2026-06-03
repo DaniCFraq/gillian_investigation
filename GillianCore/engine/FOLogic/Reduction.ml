@@ -743,7 +743,6 @@ module Canonical = struct
 
     let const_mult (const : P.t) ({ conc; symb } : t) : t =
       { conc = P.mul conc const; symb = Expr.Map.map (P.mul const) symb }
-
     let is_const_posint (c : t) : bool =
       Expr.Map.is_empty c.symb && P.is_integer c.conc && P.is_positive c.conc
 
@@ -1458,13 +1457,14 @@ and reduce_lexpr_loop
         let def = Expr.UnOp (op, fle) in
         match (op, fle) with
         | _, Lit lit -> (
+            L.normal (fun m -> m "[DEBUG] What is le = %a" Expr.pp fle);
             check_reduction 022_1;
             try Lit (CExprEval.evaluate_unop op lit) with
-            | CExprEval.TypeError err_msg ->
+            | CExprEval.TypeError err_msg -> check_reduction 022_1_1;
                 raise (ReductionException (def, err_msg))
-            | CExprEval.EvaluationError err_msg ->
+            | CExprEval.EvaluationError err_msg -> check_reduction 022_1_2;
                 raise (ReductionException (def, err_msg))
-            | e -> raise e)
+            | e -> check_reduction 022_1_3; raise e)
         | Not, UnOp (Not, ex) -> check_reduction 022_2; ex
         | Not, BinOp (ex, And, ey) -> check_reduction 022_3; BinOp (UnOp (Not, ex), Or, UnOp (Not, ey))
         | Not, BinOp (ex, Or, ey) -> check_reduction 022_4; BinOp (UnOp (Not, ex), And, UnOp (Not, ey))
@@ -2084,6 +2084,9 @@ and reduce_lexpr_loop
         let- () =
           match (flel, fler) with
           | (Lit _ as ll), (Lit _ as lr) -> (
+            L.normal (fun m ->
+                  m "[DEBUG] Literal BinOp inputs: flel = %a ; fler = %a"
+                    Expr.pp flel Expr.pp fler);
               check_reduction 105_3;
               try
                 let lit = CExprEval.evaluate_binop (CStore.init []) op ll lr in

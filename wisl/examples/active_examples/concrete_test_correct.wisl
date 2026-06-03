@@ -1,0 +1,11 @@
+{ emp }
+function main() {
+   x := new(2);
+   [x] := 1;
+   [x + 1] := 2;
+
+   y := [x];
+   z := [x + 1];
+   return y + z
+}
+{ (ret == 3) }
