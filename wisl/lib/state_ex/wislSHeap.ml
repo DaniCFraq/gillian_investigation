@@ -25,7 +25,7 @@ module Block = struct
 
   let is_empty t =
     match t with
-    | Freed -> false
+    | Freed -> true
     | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
 
   let substitution ~partial subst block =

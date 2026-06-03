@@ -29,7 +29,7 @@ module Block = struct
   let empty = Allocated { data = SFVL.empty; bound = None }
 
   let is_empty = function
-    | Freed -> false
+    | Freed -> true
     | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
 
   let substitution ~partial subst block =
