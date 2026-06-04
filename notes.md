@@ -59,3 +59,9 @@ If the only allocated block has been freed, the leak check should succeed and no
 Changes:
 /home/dani/Gillian/wisl/lib/state_frac/wislSHeap.ml --- is_empty function --- Freed -> true
 /home/dani/Gillian/wisl/lib/state_ex/wislSHeap.ml --- is_empty function --- Freed -> true
+
+# Another error from gillian?
+
+Line 188 /home/dani/Gillian/wisl/lib/state_frac/wislSHeap.ml
+
+An BufferOverflow error is outputing use after free.Change this to out of bounds.

@@ -1,28 +1,22 @@
-Compilation time: 0.000562s
-Total time (Compilation + Symbolic testing): 0.002960s
+Compilation time: 0.000445s
+Total time (Compilation + Symbolic testing): 0.003026s
 Errors occurred!
 Here's a counterexample: [  ]
-Here's an example of final error state: FAILURE TERMINATION: Procedure Memory Leak Check post-execution, Command -1 [wisl/examples/active_examples/double_free_error.wisl 5:12-16]
-                                        Errors: MemoryLeak
+Here's an example of final error state: FAILURE TERMINATION: Procedure main, Command 2 [wisl/examples/active_examples/null_deference_error.wisl 6:3-18]
+                                        Errors: Use After Free
                                         FINAL STATE:
                                           SPEC VARS: 
                                           STORE:
-                                            (gvar0: {{  }})
-                                            (ret: Lit null)
+                                            (gvar0: {{ Lit #loc_0, Lit 10i }})
                                             (x: {{ Lit #loc_0, Lit 0i }})
                                           
                                           MEMORY:
-                                            #loc_0 -> BOUND: 10
-                                                      {0i: 42i
+                                            #loc_0 -> BOUND: 5
+                                                      {0i: null
                                                        1i: null
                                                        2i: null
                                                        3i: null
-                                                       4i: null
-                                                       5i: null
-                                                       6i: null
-                                                       7i: null
-                                                       8i: null
-                                                       9i: null}
+                                                       4i: null}
                                           
                                           PURE FORMULAE:
                                             

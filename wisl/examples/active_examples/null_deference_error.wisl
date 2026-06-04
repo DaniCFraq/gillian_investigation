@@ -1,0 +1,7 @@
+{ emp }
+function main() {
+    y := null;
+    v := [y];
+    return null
+}
+{ (ret == null)}
