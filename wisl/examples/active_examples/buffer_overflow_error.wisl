@@ -1,0 +1,9 @@
+{ emp }
+function main() {
+    x := new(1);
+    [x] := 1;
+    [x + 1] := 2;
+    free(x);
+    return null
+}
+{ (ret == null)}
