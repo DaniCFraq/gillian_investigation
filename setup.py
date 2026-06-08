@@ -117,6 +117,7 @@ def test_reductions(simplifications, run_cmd):
                 restore_reduction_file()
                 sys.exit(1)
         restore_reduction_file()
+        clear_output_file()
 
     return can_disable, mandatory_error, mandatory_timeout
 
@@ -240,10 +241,14 @@ def main():
         print(f"Error: '{folder}' is not a valid directory.")
         sys.exit(1)
 
-    wisl_files = sorted(folder.rglob("*.wisl"))
+    all_wisl_files = sorted(folder.rglob("*.wisl"))
+    wisl_files = [p for p in all_wisl_files if "error" not in p.name.lower()]
     if not wisl_files:
-        print(f"No .wisl files found under '{folder}'.")
+        print(f"No .wisl files found under '{folder}' (after filtering 'error').")
         sys.exit(0)
+    skipped = len(all_wisl_files) - len(wisl_files)
+    if skipped > 0:
+        print(f"Skipping {skipped} .wisl file(s) with 'error' in name.")
 
     print(f"Found {len(wisl_files)} .wisl file(s) under '{folder}'.")
     already_processed = load_already_processed(args.output_csv)
