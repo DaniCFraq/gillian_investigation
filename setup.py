@@ -63,9 +63,12 @@ def restore_reduction_file():
 def test_reductions(simplifications, run_cmd):
     """
     Test each simplification by disabling it one at a time.
-    Returns the list of simplifications that can safely be disabled.
+    Returns three lists: optional simplifications, mandatory simplifications due
+    to error, and mandatory simplifications due to timeout.
     """
     can_disable = []
+    mandatory_error = []
+    mandatory_timeout = []
 
     for simplification in simplifications:
         try:
@@ -90,12 +93,15 @@ def test_reductions(simplifications, run_cmd):
             )
         except subprocess.TimeoutExpired:
             print(f"  Timeout ({RUN_TIMEOUT}s) for simplification {simplification}; skipping.")
+            mandatory_timeout.append(simplification)
             skip = True
         except subprocess.CalledProcessError:
             print(f"  Run error for simplification {simplification}; skipping.")
+            mandatory_error.append(simplification)
             skip = True
         except Exception as e:
             print(f"  Unexpected error testing simplification {simplification}: {e}")
+            mandatory_error.append(simplification)
             skip = True
 
         if not skip:
@@ -104,13 +110,15 @@ def test_reductions(simplifications, run_cmd):
                     trace = f.read()
                 if not any(k in trace.lower() for k in ("failure", "failures", "error", "backtrace")):
                     can_disable.append(simplification)
+                else:
+                    mandatory_error.append(simplification)
             except FileNotFoundError:
                 print(f"Error: Output file {output} not found.")
                 restore_reduction_file()
                 sys.exit(1)
         restore_reduction_file()
 
-    return can_disable
+    return can_disable, mandatory_error, mandatory_timeout
 
 def load_already_processed(csv_path: str) -> set[str]:
     """
@@ -172,13 +180,18 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     processed_reductions = process_simplifications(reductions_array)
     print(f"  All simplifications found:     {processed_reductions}")
 
-    optional = test_reductions(processed_reductions, test_cmd)
-    mandatory = [r for r in processed_reductions if r not in optional]
+    optional, mandatory_error, mandatory_timeout = test_reductions(processed_reductions, test_cmd)
 
-    print(f"  Mandatory simplifications: {mandatory}")
+    print(f"  Mandatory simplifications (error): {mandatory_error}")
+    print(f"  Mandatory simplifications (timeout): {mandatory_timeout}")
     print(f"  Optional  simplifications: {optional}")
 
-    return {"file": wisl_path, "mandatory": mandatory, "optional": optional}
+    return {
+        "file": wisl_path,
+        "mandatory_error": mandatory_error,
+        "mandatory_timeout": mandatory_timeout,
+        "optional": optional,
+    }
 
 def append_to_csv(results: list[dict], csv_path: str):
     """
@@ -192,11 +205,17 @@ def append_to_csv(results: list[dict], csv_path: str):
     with open(csv_file, "a", newline="") as f:
         writer = csv.writer(f)
         if write_header:
-            writer.writerow(["file", "mandatory_simplifications", "optional_simplifications"])
+            writer.writerow([
+                "file",
+                "mandatory_simplifications_error",
+                "mandatory_simplifications_timeout",
+                "optional_simplifications",
+            ])
         for row in results:
             writer.writerow([
                 row["file"],
-                "; ".join(row["mandatory"]),
+                "; ".join(row["mandatory_error"]),
+                "; ".join(row["mandatory_timeout"]),
                 "; ".join(row["optional"]),
             ])
     print(f"\nResults appended to: {csv_path}")

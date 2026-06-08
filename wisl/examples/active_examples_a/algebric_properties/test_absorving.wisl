@@ -1,0 +1,12 @@
+predicate is_int(+a: Int) {
+    emp
+}
+
+{ (x == #x) * is_int(x) }
+function test_absorbing(x) {
+    r1 := x * 0;
+    r2 := 0 * x;
+    r3 := 0 / x;
+    return null
+}
+{ true }

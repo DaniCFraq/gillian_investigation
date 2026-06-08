@@ -67,4 +67,4 @@ Changes:
 
 Line 188 /home/dani/Gillian/wisl/lib/state_frac/wislSHeap.ml
 
-An BufferOverflow error is outputing use after free.Change this to out of bounds.
+An BufferOverflow error is outputing use after free. Change this to out of bounds.
