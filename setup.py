@@ -10,6 +10,7 @@ from pathlib import Path
     2º - Ao processar as simplififcações, deixamos apenas aquelas que estão a ser realmente usadas, sem desativar a simplificação pai (do topo).
     3º - Verificar quais simplificações podem ser desativadas. Para isso, vamos correr o programa com uma simplificação desativada de cada vez. Se essa simplificação der erro, continuamos, se não der erro, adicionamos ao array de simplificações que podem ser desativadas.
     4º - Para cada ficheiro .wisl encontrado recursivamente na pasta indicada, guarda o caminho, as simplificações obrigatórias e as opcionais num ficheiro CSV.
+    5º - Se o ficheiro .wisl já existir no CSV, é ignorado (skip).
 """
 
 compile_cmd: str = "dune build"
@@ -27,7 +28,7 @@ def make_run_cmd(wisl_path: str, with_logging: bool = True) -> str:
 
 def clear_output_file():
     Path(output).write_text("")
-    Path("file.log").write_text("")   # also clear log before initial run
+    Path("file.log").write_text("")
 
 
 def process_simplifications(reductions_array):
@@ -67,9 +68,6 @@ def test_reductions(simplifications, run_cmd):
     can_disable = []
 
     for simplification in simplifications:
-        # 1. Patch: replace original_line with the disabled-simplification line.
-        #    The file on disk must always contain original_line at this point
-        #    (guaranteed by the restore step at the end of each iteration).
         try:
             with open(reduction_file, "r") as f:
                 content = f.read()
@@ -82,18 +80,6 @@ def test_reductions(simplifications, run_cmd):
         with open(reduction_file, "w") as f:
             f.write(patched)
 
-        # 2. Recompile with the patch applied.
-        # try:
-        #     subprocess.run(
-        #         compile_cmd, shell=True, check=True,
-        #         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        #     )
-        # except subprocess.CalledProcessError:
-        #     print(f"Compile error while testing simplification {simplification}; aborting.")
-        #     restore_reduction_file()
-        #     sys.exit(1)
-
-        # 3. Run the .wisl file and check the output.
         skip = False
         try:
             clear_output_file()
@@ -122,12 +108,25 @@ def test_reductions(simplifications, run_cmd):
                 print(f"Error: Output file {output} not found.")
                 restore_reduction_file()
                 sys.exit(1)
-
-        # 4. Restore original_line so the next iteration always starts from a clean file.
         restore_reduction_file()
 
     return can_disable
 
+def load_already_processed(csv_path: str) -> set[str]:
+    """
+    Reads the CSV and returns a set of file paths already present.
+    Returns an empty set if the CSV does not exist yet.
+    """
+    processed = set()
+    csv_file = Path(csv_path)
+    if not csv_file.exists():
+        return processed
+    with open(csv_file, "r", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if "file" in row:
+                processed.add(row["file"])
+    return processed
 
 def process_wisl_file(wisl_path: str) -> dict | None:
     """
@@ -136,7 +135,7 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     Returns None if the file could not be run.
     """
     global line_to_replace
-    line_to_replace = original_line  # reset for each file
+    line_to_replace = original_line
 
     run_cmd  = make_run_cmd(wisl_path, with_logging=True)
     test_cmd = make_run_cmd(wisl_path, with_logging=False)
@@ -144,7 +143,6 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     print(f"Processing: {wisl_path}")
     print(f"{'='*60}")
 
-    # Run the .wisl file and read the log
     try:
         clear_output_file()
         subprocess.run(
@@ -174,7 +172,6 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     processed_reductions = process_simplifications(reductions_array)
     print(f"  All simplifications found:     {processed_reductions}")
 
-    # Test which ones are optional (can be disabled without breaking the run)
     optional = test_reductions(processed_reductions, test_cmd)
     mandatory = [r for r in processed_reductions if r not in optional]
 
@@ -183,20 +180,26 @@ def process_wisl_file(wisl_path: str) -> dict | None:
 
     return {"file": wisl_path, "mandatory": mandatory, "optional": optional}
 
+def append_to_csv(results: list[dict], csv_path: str):
+    """
+    Appends new results to the CSV file.
+    Creates the file with a header if it does not exist yet.
+    Never removes or rewrites existing entries.
+    """
+    csv_file = Path(csv_path)
+    write_header = not csv_file.exists()
 
-def write_csv(results: list[dict], csv_path: str):
-    """Write results to a CSV file."""
-    with open(csv_path, "w", newline="") as f:
+    with open(csv_file, "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["file", "mandatory_simplifications", "optional_simplifications"])
+        if write_header:
+            writer.writerow(["file", "mandatory_simplifications", "optional_simplifications"])
         for row in results:
             writer.writerow([
                 row["file"],
                 "; ".join(row["mandatory"]),
                 "; ".join(row["optional"]),
             ])
-    print(f"\nResults saved to: {csv_path}")
-
+    print(f"\nResults appended to: {csv_path}")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -218,30 +221,36 @@ def main():
         print(f"Error: '{folder}' is not a valid directory.")
         sys.exit(1)
 
-    # Collect all .wisl files recursively, sorted for determinism
     wisl_files = sorted(folder.rglob("*.wisl"))
     if not wisl_files:
         print(f"No .wisl files found under '{folder}'.")
         sys.exit(0)
 
     print(f"Found {len(wisl_files)} .wisl file(s) under '{folder}'.")
+    already_processed = load_already_processed(args.output_csv)
+    if already_processed:
+        print(f"Skipping {len(already_processed)} file(s) already in '{args.output_csv}'.")
 
     results = []
     try:
         for wisl_file in wisl_files:
-            result = process_wisl_file(str(wisl_file))
+            wisl_str = str(wisl_file)
+            if wisl_str in already_processed:
+                print(f"  [SKIP] {wisl_str} (already in CSV)")
+                continue
+
+            result = process_wisl_file(wisl_str)
             if result is not None:
                 results.append(result)
     finally:
-        # Always restore the reduction file, even on Ctrl-C or crash
         print("\nRestoring reduction file...")
         restore_reduction_file()
         print("Reduction file restored.")
 
     if results:
-        write_csv(results, args.output_csv)
+        append_to_csv(results, args.output_csv)
     else:
-        print("No results to write.")
+        print("No new results to write.")
 
 
 if __name__ == "__main__":

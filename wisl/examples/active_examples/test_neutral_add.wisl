@@ -1,0 +1,14 @@
+predicate is_int(+a: Int) {
+    emp
+}
+
+{ (x == #x) * is_int(x)}
+function test_neutral_add(x) {
+    r1 := x + 0;
+    r2 := 0 + x;
+    r3 := x * 1;
+    r4 := 1 * x;
+    r5 := x - 0;
+    return null
+}
+{ true }

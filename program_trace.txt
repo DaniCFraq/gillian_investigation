@@ -1,25 +1,9 @@
-Compilation time: 0.000445s
-Total time (Compilation + Symbolic testing): 0.003026s
-Errors occurred!
-Here's a counterexample: [  ]
-Here's an example of final error state: FAILURE TERMINATION: Procedure main, Command 2 [wisl/examples/active_examples/null_deference_error.wisl 6:3-18]
-                                        Errors: Use After Free
-                                        FINAL STATE:
-                                          SPEC VARS: 
-                                          STORE:
-                                            (gvar0: {{ Lit #loc_0, Lit 10i }})
-                                            (x: {{ Lit #loc_0, Lit 0i }})
-                                          
-                                          MEMORY:
-                                            #loc_0 -> BOUND: 5
-                                                      {0i: null
-                                                       1i: null
-                                                       2i: null
-                                                       3i: null
-                                                       4i: null}
-                                          
-                                          PURE FORMULAE:
-                                            
-                                          
-                                          TYPING ENVIRONMENT:
-                                            
+Parsing and compiling...
+Preprocessing...
+Obtaining specs to verify...
+Obtaining lemmas to verify...
+Obtained 2 symbolic tests in total
+Running symbolic tests: 0.016422
+Verifying one spec of procedure llen... s Success
+Verifying one spec of procedure llen... s Success
+All specs succeeded: 0.018187

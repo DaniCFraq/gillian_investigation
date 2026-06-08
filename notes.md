@@ -24,6 +24,9 @@ In verification_console.ml:87, verify only parses, preprocesses, and proves spec
 
 dune exec -- wisl wpst wisl/examples/active_examples/memory_leak_error.wisl --leak-check -l disabled > program_trace.txt 2>&1
 
+# Run the benchmark
+python3 setup.py wisl/examples/active_examples --output-csv file_simplification_results.csv
+
 # TODO: Create an issue in Gillian GitHub repo
 
 Title
@@ -60,7 +63,7 @@ Changes:
 /home/dani/Gillian/wisl/lib/state_frac/wislSHeap.ml --- is_empty function --- Freed -> true
 /home/dani/Gillian/wisl/lib/state_ex/wislSHeap.ml --- is_empty function --- Freed -> true
 
-# Another error from gillian?
+# TODO: Another error from gillian?
 
 Line 188 /home/dani/Gillian/wisl/lib/state_frac/wislSHeap.ml
 
