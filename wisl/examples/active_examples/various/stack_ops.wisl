@@ -1,0 +1,48 @@
+predicate SLL(+x, vs) {
+  (x == null) * (vs == []);
+  (x -b> #v, #next) * SLL(#next, #vs) * (vs == #v :: #vs)
+}
+
+predicate Stack(+x, vs) {
+  SLL(x, vs)
+}
+
+predicate StackPopResult(+ret, vs) {
+  (vs == []) * (ret == null);
+  (vs == #hd :: #tl) * (ret -b> #hd, #new_head) * Stack(#new_head, #tl)
+}
+
+
+{ (x == #x) * (k == #k) * Stack(#x, #vs) }
+function stack_push(x, k) {
+  node := new(2);
+  [node] := k;
+  [node + 1] := x;
+  return node
+}
+{ Stack(ret, #k :: #vs) }
+
+
+{ (x == #x) * Stack(#x, #vs) }
+function stack_pop(x) {
+  if (x == null) {
+    r := null
+  } else {
+    v := [x];
+    next := [x + 1];
+    free(x);
+    r := new(2);
+    [r] := v;
+    [r + 1] := next
+  };
+  return r
+}
+{ StackPopResult(ret, #vs) }
+
+
+{ (x == #x) * Stack(#x, #vs) }
+function stack_is_empty(x) {
+  b := (x == null);
+  return b
+}
+{ Stack(#x, #vs) * (ret == (#vs == [])) }

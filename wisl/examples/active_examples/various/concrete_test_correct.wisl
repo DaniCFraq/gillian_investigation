@@ -6,6 +6,7 @@ function main() {
 
    y := [x];
    z := [x + 1];
+   free(x);
    return y + z
 }
 { (ret == 3) }

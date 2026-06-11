@@ -4,6 +4,7 @@ function main() {
     [x] := 1;
     [x + 1] := 2;
     [x + 2] := 3;
+    free(x);
     return null
 }
 { (ret == null) * emp }
