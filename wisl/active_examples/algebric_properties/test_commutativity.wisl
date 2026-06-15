@@ -1,0 +1,19 @@
+predicate is_int(+a: Int) {
+    emp
+}
+
+{ (a == #a) * is_int(a) * (b == #b) * is_int(b) }
+function test_commutativity(a, b) {
+    r1 := a + b;
+    r2 := b + a;
+
+    r3 := a * b;
+    r4 := b * a;
+
+    r := new(2);
+    [r] := r1 == r2;
+    [r + 1] := r3 == r4;
+
+    return r
+}
+{ (ret -> true, true) }

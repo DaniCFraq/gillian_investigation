@@ -1,0 +1,92 @@
+//
+// Binary Search Tree — search, insertion and disposal
+//
+// Covers:
+//   - recursive predicate over a 3-cell node (value, left, right)
+//   - contains: pure traversal, the tree frame survives the call
+//   - insert: structural modification, tree ownership threaded back out
+//   - free: recursive disposal
+//
+// Node layout: [value | left_ptr | right_ptr]
+//
+// The functions assume the usual BST ordering (every value in the left
+// subtree is below the root, every value in the right subtree is above
+// it).  We verify against the *shape* predicate below: the ordering
+// guides the traversal but the memory-safety / shape contract is what is
+// machine-checked here.
+//
+
+predicate BST(+t) {
+  (t == null);
+  (t -b> #v, #left, #right) * BST(#left) * BST(#right)
+}
+
+// 01. Search: does value k appear in the BST?
+{ (t == #t) * (k == #k) * BST(#t) }
+function bst_contains(t, k) {
+  found := false;
+  if (t == null) {
+    found := false
+  } else {
+    v := [t];
+    if (v == k) {
+      found := true
+    } else {
+      if (k < v) {
+        left := [t + 1];
+        found := bst_contains(left, k)
+      } else {
+        right := [t + 2];
+        found := bst_contains(right, k)
+      }
+    }
+  };
+  return found
+}
+{ BST(#t) * (ret : Bool) }
+
+// 02. Insert: add k, preserving the tree shape.
+//     Returns the (possibly new) root.
+{ (t == #t) * (k == #k) * BST(#t) }
+function bst_insert(t, k) {
+  if (t == null) {
+    node := new(3);
+    [node]     := k;
+    [node + 1] := null;
+    [node + 2] := null;
+    t := node
+  } else {
+    v := [t];
+    if (k < v) {
+      left  := [t + 1];
+      left  := bst_insert(left, k);
+      [t + 1] := left
+    } else {
+      if (v < k) {
+        right := [t + 2];
+        right := bst_insert(right, k);
+        [t + 2] := right
+      } else {
+        skip  // k already present, no-op
+      }
+    }
+  };
+  return t
+}
+{ BST(ret) }
+
+// 03. Free the whole tree
+{ (t == #t) * BST(#t) }
+function bst_free(t) {
+  if (t == null) {
+    skip
+  } else {
+    left  := [t + 1];
+    right := [t + 2];
+    rl := bst_free(left);
+    rr := bst_free(right);
+    free(t)
+  };
+  return null
+}
+{ emp }

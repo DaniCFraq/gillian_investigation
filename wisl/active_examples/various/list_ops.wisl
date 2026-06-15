@@ -1,0 +1,45 @@
+predicate list(+x, alpha) {
+    (x == null) * (alpha == []);
+    (x -b> #v, #z) * list(#z, #beta) * (alpha == #v :: #beta)
+}
+
+// Returns the head value of a non-empty heap list
+{ (x == #x) * list(#x, #v :: #vs) }
+function list_head(x) {
+    v := [x];
+    return v
+}
+{ list(#x, #v :: #vs) * (ret == #v) }
+
+// Frees the head node and returns the tail pointer
+{ (x == #x) * list(#x, #v :: #vs) }
+function list_tail(x) {
+    t := [x + 1];
+    free(x);
+    return t
+}
+{ list(ret, #vs) }
+
+// Prepends a value to a heap list; returns the new head pointer
+{ (x == #x) * (v == #v) * list(#x, #alpha) }
+function list_prepend(x, v) {
+    node := new(2);
+    [node] := v;
+    [node + 1] := x;
+    return node
+}
+{ list(ret, #v :: #alpha) }
+
+// Returns the number of elements in a heap list
+{ (x == #x) * list(#x, #alpha) }
+function list_length(x) {
+    if (x == null) {
+        n := 0
+    } else {
+        t := [x + 1];
+        n := list_length(t);
+        n := n + 1
+    };
+    return n
+}
+{ list(#x, #alpha) * (ret == len(#alpha)) }

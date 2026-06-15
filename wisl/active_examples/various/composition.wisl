@@ -1,0 +1,44 @@
+// Demonstrates compositional verification: the postcondition of a callee
+// becomes a heap resource in the caller's proof, without inlining.
+
+predicate is_int(+a: Int) {
+    emp
+}
+
+// A single-value heap cell (uses a 2-field block; field 1 is unused)
+predicate cell(+p, v) {
+    (p -b> v, #unused)
+}
+
+// Allocates a cell containing v
+{ (v == #v) * is_int(v) }
+function alloc_cell(v) {
+    p := new(2);
+    [p] := v;
+    return p
+}
+{ cell(ret, #v) }
+
+// Reads the value stored in a cell, leaving it intact
+{ (p == #p) * cell(#p, #v) }
+function read_cell(p) {
+    v := [p];
+    return v
+}
+{ cell(#p, #v) * (ret == #v) }
+
+// Allocates two cells with values a and b, reads both, frees both,
+// and returns their sum.  The verifier composes the contracts of
+// alloc_cell and read_cell rather than looking inside them.
+{ (a == #a) * is_int(a) * (b == #b) * is_int(b) }
+function sum_of_two_cells(a, b) {
+    p := alloc_cell(a);
+    q := alloc_cell(b);
+    va := read_cell(p);
+    vb := read_cell(q);
+    free(p);
+    free(q);
+    s := va + vb;
+    return s
+}
+{ (ret == #a + #b) }

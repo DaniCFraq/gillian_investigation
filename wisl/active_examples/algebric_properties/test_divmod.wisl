@@ -1,0 +1,16 @@
+predicate is_int(+a: Int) {
+    emp
+}
+
+{ (a == #a) * is_int(a) * (b == #b) * is_int(b) * (! (b == 0)) }
+function test_divmod(a, b) {
+    q := a / b;
+    r := a % b;
+    reconstructed := (q * b) + r;
+
+    result := new(1);
+    [result] := reconstructed == a;
+
+    return result
+}
+{ (ret -> true) }

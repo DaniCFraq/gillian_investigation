@@ -1,0 +1,19 @@
+predicate is_float(+a: Float) {
+    emp
+}
+
+{ (a == #a) * is_float(a) * (b == #b) * is_float(b) * (c == #c) * is_float(c) }
+function test_float_distributivity(a, b, c) {
+    r1 := a f* (b f+ c);
+    r2 := (a f* b) f+ (a f* c);
+
+    r3 := a f* (b f- c);
+    r4 := (a f* b) f- (a f* c);
+
+    r := new(2);
+    [r] := r1 == r2;
+    [r + 1] := r3 == r4;
+
+    return r
+}
+{ (ret -> true, true) }

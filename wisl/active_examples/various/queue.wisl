@@ -1,0 +1,104 @@
+//
+// FIFO queue backed by a singly-linked list with a tail pointer and a
+// sentinel node.  The handle q is a 2-cell block: q[0] = head, q[1] = tail.
+// The list segment from head up to (but excluding) the sentinel holds the
+// queue contents; the sentinel is an extra empty node that the tail points
+// at, so that enqueue can append in O(1).
+//
+
+predicate SLLseg(+x, y, vs) {
+  (x == y) * (vs == []);
+  (x -b> #v, #next) * SLLseg(#next, y, #vs) * (vs == #v :: #vs)
+}
+
+predicate Queue(+q, vs) {
+  (q -b> #head, #tail) *
+  SLLseg(#head, #tail, vs) *
+  (#tail -b> #sentinel_v, null)
+}
+
+predicate QueueDequeueResult(+q, +ret, vs) {
+  (vs == []) * Queue(q, []) * (ret == 0);
+  (vs == #hd :: #tl) * Queue(q, #tl) * (ret == #hd)
+}
+
+// Lemma: extend a segment by the node sitting at its far end.
+//   SLLseg(x, y, vs) * (y -b> v, z)  |-  SLLseg(x, z, vs @ [v])
+lemma SLLseg_append {
+  statement:
+    forall x, vs, v, z.
+      SLLseg(x, #y, vs) * (#y -b> v, z) |- SLLseg(x, z, vs @ [ v ])
+
+  proof:
+    unfold SLLseg(x, #y, vs);
+    if (x != #y) {
+      assert {bind: #nv, #nnext, #nvs}
+        (x -b> #nv, #nnext) * SLLseg(#nnext, #y, #nvs) * (vs == #nv :: #nvs);
+      apply SLLseg_append(#nnext, #nvs, v, z);
+      fold SLLseg(x, z, vs @ [ v ])
+    } else {
+      fold SLLseg(#y, z, [ v ])
+    }
+}
+
+// 00. Create an empty queue (allocate handle + sentinel node)
+{ emp }
+function queue_new() {
+  sentinel := new(2);
+  [sentinel]     := 0;
+  [sentinel + 1] := null;
+  q := new(2);
+  [q]     := sentinel;
+  [q + 1] := sentinel;
+  return q
+}
+{ Queue(ret, []) }
+
+// 01. Enqueue: add k at the tail
+{ (q == #q) * (k == #k) * Queue(#q, #vs) }
+function queue_enqueue(q, k) {
+  [[ unfold Queue(#q, #vs) ]];
+  [[ assert {bind: #head, #tl, #sv}
+       (q -b> #head, #tl) * SLLseg(#head, #tl, #vs) * (#tl -b> #sv, null) ]];
+  tail := [q + 1];                 // tail == #tl
+  [tail]     := k;                 // turn the old sentinel into a real node...
+  new_sent   := new(2);            // ...and allocate a fresh sentinel
+  [new_sent]     := 0;
+  [new_sent + 1] := null;
+  [tail + 1]     := new_sent;      // #tl -b> #k, new_sent
+  [q + 1]        := new_sent;      // q  -b> #head, new_sent
+  [[ apply SLLseg_append(#head, #vs, #k, new_sent) ]];
+  [[ fold Queue(#q, #vs @ [#k]) ]];
+  return q
+}
+{ Queue(ret, #vs @ [#k]) }
+
+// 02. Dequeue: remove and return the head value.
+//     Returns 0 if the queue was empty (head == tail == sentinel).
+{ (q == #q) * Queue(#q, #vs) }
+function queue_dequeue(q) {
+  head := [q];
+  tail := [q + 1];
+  if (head == tail) {
+    v := 0
+  } else {
+    v    := [head];
+    next := [head + 1];
+    free(head);
+    [q] := next
+  };
+  return v
+}
+{ QueueDequeueResult(#q, ret, #vs) }
+
+// 03. is_empty
+{ (q == #q) * Queue(#q, #vs) }
+function queue_is_empty(q) {
+  head := [q];
+  tail := [q + 1];
+  b := (head == tail);
+  [[ unfold SLLseg(head, tail, #vs) ]];
+  [[ fold SLLseg(head, tail, #vs) ]];
+  return b
+}
+{ Queue(#q, #vs) * (ret == (#vs == [])) }
