@@ -2,11 +2,17 @@ predicate is_int(+a: Int) {
     emp
 }
 
-{ (x == #x) * is_int(x) }
+{ (x == #x) * is_int(x) * (! (x == 0)) }
 function test_absorbing(x) {
     r1 := x * 0;
     r2 := 0 * x;
     r3 := 0 / x;
-    return null
+
+    r := new(3);
+    [r]     := r1 == 0;
+    [r + 1] := r2 == 0;
+    [r + 2] := r3 == 0;
+
+    return r
 }
-{ true }
+{ (ret -> true, true, true) }

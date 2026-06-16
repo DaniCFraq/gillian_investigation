@@ -1,4 +1,4 @@
-{ true }
+{ emp }
 function main() {
     x := new(10);
     [x] := 42;

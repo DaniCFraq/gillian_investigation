@@ -1,5 +1,6 @@
-
+{ (y == #y) * (#y -> #v) }
 function write(x, y) {
- [y] := 6;
- return 0
+    [y] := 6;
+    return 0
 }
+{ (#y -> 6) * (ret == 0) }

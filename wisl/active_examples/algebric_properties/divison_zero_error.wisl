@@ -3,4 +3,4 @@ function main() {
     r := 1 / 0;
     return null
 }
-{ true }
+{ (ret == null) }

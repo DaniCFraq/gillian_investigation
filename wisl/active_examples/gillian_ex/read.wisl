@@ -1,5 +1,6 @@
-
+{ (y == #y) * (#y -> #v) }
 function read(x, y) {
     r := [y];
     return r
 }
+{ (#y -> #v) * (ret == #v) }
