@@ -2,6 +2,17 @@
     expression [e] being malformed with explanation [msg] *)
 exception ReductionException of Gil_syntax.Expr.t * string
 
+(** [ReductionDisabled] is raised by {!check_reduction} when the queried
+    reduction/simplification rule has been disabled via [disable_reductions].
+    Callers wrap the rule's body and fall back to the un-rewritten form. *)
+exception ReductionDisabled
+
+(** [check_reduction n] records that the reduction/simplification rule tagged [n]
+    has fired (emitting a [REDUCE_...] log entry), or raises {!ReductionDisabled}
+    if [n] is currently disabled. Used to instrument both [Reduction] and
+    [Simplifications] so the benchmark harness can observe and toggle each rule. *)
+val check_reduction : int -> unit
+
 (** [resolve_to_location pfs e] attempts to resolve the expression denoted by
     [e] to a location given the pure formulae [pfs]. If successful, it returns
     that location, together with any bindings learned during the resolution. *)

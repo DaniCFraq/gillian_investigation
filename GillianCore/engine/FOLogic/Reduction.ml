@@ -9,21 +9,41 @@ let disable_reductions (ns : int list ) =
 
 module L = Logging
 
-let reduction_source_file = "GillianCore/engine/FOLogic/Reduction.ml"
+(* Source files that may contain [check_reduction] tags. The logger reads the
+   caller's source line to recover the human-readable tag (e.g. "600_1"), so any
+   file that calls [check_reduction] must be registered here. *)
+let tag_source_files =
+  [
+    ("Reduction.ml", "GillianCore/engine/FOLogic/Reduction.ml");
+    ("Simplifications.ml", "GillianCore/engine/FOLogic/Simplifications.ml");
+  ]
 
-let reduction_source_lines =
-  lazy
-    (try
-       let channel = open_in reduction_source_file in
-       let rec read_lines acc =
-         match input_line channel with
-         | line -> read_lines (line :: acc)
-         | exception End_of_file ->
-             close_in_noerr channel;
-             Array.of_list (List.rev acc)
-       in
-       read_lines []
-     with _ -> [||])
+let read_source_lines path =
+  try
+    let channel = open_in path in
+    let rec read_lines acc =
+      match input_line channel with
+      | line -> read_lines (line :: acc)
+      | exception End_of_file ->
+          close_in_noerr channel;
+          Array.of_list (List.rev acc)
+    in
+    read_lines []
+  with _ -> [||]
+
+let source_lines_cache : (string, string array) Hashtbl.t = Hashtbl.create 2
+
+let source_lines_for (basename : string) : string array =
+  match Hashtbl.find_opt source_lines_cache basename with
+  | Some lines -> lines
+  | None ->
+      let lines =
+        match List.assoc_opt basename tag_source_files with
+        | Some path -> read_source_lines path
+        | None -> [||]
+      in
+      Hashtbl.replace source_lines_cache basename lines;
+      lines
 
 let rec find_substring haystack needle index =
   let haystack_len = String.length haystack in
@@ -67,14 +87,21 @@ let reduction_tag_from_callstack () =
           | Some _ -> acc
           | None -> (
               match Printexc.Slot.location slot with
-              | Some loc
-                when Filename.basename loc.filename = "Reduction.ml"
-                     && loc.line_number > 100 ->
-                  let lines = Lazy.force reduction_source_lines in
-                  if loc.line_number - 1 < Array.length lines then
-                    reduction_tag_from_line lines.(loc.line_number - 1)
-                  else None
-              | _ -> None))
+              | Some loc -> (
+                  let basename = Filename.basename loc.filename in
+                  match List.assoc_opt basename tag_source_files with
+                  | Some _ ->
+                      (* The definition lines of the tagging machinery itself do
+                         not contain a "check_reduction <n>" call site, so
+                         [reduction_tag_from_line] returns [None] for them; the
+                         first caller slot that holds a real tag wins. *)
+                      let lines = source_lines_for basename in
+                      let idx = loc.line_number - 1 in
+                      if idx >= 0 && idx < Array.length lines then
+                        reduction_tag_from_line lines.(idx)
+                      else None
+                  | None -> None)
+              | None -> None))
         None slots
 
 let log_reduction (n : int) =
