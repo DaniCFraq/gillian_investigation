@@ -2,6 +2,8 @@ import subprocess
 import re
 import sys
 import csv
+import os
+import signal
 import argparse
 from pathlib import Path
 
@@ -20,6 +22,36 @@ output: str = "program_trace.txt"
 
 original_line: str = line_to_replace
 RUN_TIMEOUT = 25
+
+
+def _killpg(pgid: int):
+    """Hard-kill an entire process group, ignoring it if it's already gone."""
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def run_command(cmd: str, timeout: int | None = None, check: bool = False) -> int:
+    proc = subprocess.Popen(
+        cmd, shell=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    pgid = proc.pid
+    try:
+        returncode = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _killpg(pgid)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
+        raise
+    _killpg(pgid)
+    if check and returncode != 0:
+        raise subprocess.CalledProcessError(returncode, cmd)
+    return returncode
 
 
 def make_run_cmd(wisl_path: str, with_logging: bool = True) -> str:
@@ -86,11 +118,7 @@ def test_reductions(simplifications, run_cmd):
         skip = False
         try:
             clear_output_file()
-            subprocess.run(
-                run_cmd, shell=True, check=True,
-                timeout=RUN_TIMEOUT,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            run_command(run_cmd, timeout=RUN_TIMEOUT, check=True)
         except subprocess.TimeoutExpired:
             print(f"  Timeout ({RUN_TIMEOUT}s) for simplification {simplification}; skipping.")
             mandatory_timeout.append(simplification)
@@ -154,10 +182,7 @@ def process_wisl_file(wisl_path: str) -> dict | None:
 
     try:
         clear_output_file()
-        subprocess.run(
-            run_cmd, shell=True, check=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
+        run_command(run_cmd, check=True)
     except subprocess.CalledProcessError:
         print(f"  Error running {wisl_path}; skipping.")
         return None
