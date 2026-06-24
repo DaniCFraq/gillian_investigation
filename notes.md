@@ -27,6 +27,10 @@ dune exec -- wisl wpst wisl/examples/active_examples/memory_leak_error.wisl --le
 # Run the benchmark
 python3 setup.py wisl/examples/active_examples --output-csv file_simplification_results.csv
 
+# Run the C wrong simplification example
+
+dune exec -- gillian-c verify   Gillian-C/examples/simplification_bugs/rounding_068.c
+
 # TODO: Create an issue in Gillian GitHub repo
 
 Title

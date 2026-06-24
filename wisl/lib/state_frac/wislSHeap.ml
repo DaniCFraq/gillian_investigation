@@ -29,6 +29,10 @@ module Block = struct
   let empty = Allocated { data = SFVL.empty; bound = None }
 
   let is_empty = function
+    | Freed -> false
+    | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
+
+  let is_empty_or_freed = function
     | Freed -> true
     | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
 
@@ -406,6 +410,9 @@ let substitution_in_place subst heap =
   Delayed.return heap
 
 let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
+
+let is_empty_or_freed t =
+  Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty_or_freed
 
 let assertions heap =
   Hashtbl.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []

@@ -25,6 +25,11 @@ module Block = struct
 
   let is_empty t =
     match t with
+    | Freed -> false
+    | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
+
+  let is_empty_or_freed t =
+    match t with
     | Freed -> true
     | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
 
@@ -357,6 +362,9 @@ let to_seq heap =
          | Allocated { data; bound } -> (loc, Some (data, bound)))
 
 let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
+
+let is_empty_or_freed t =
+  Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty_or_freed
 
 (***** Clean-up *****)
 

@@ -15,6 +15,7 @@ type err =
 
 val init : unit -> t
 val is_empty : t -> bool
+val is_empty_or_freed : t -> bool
 val alloc : t -> int -> string
 val dispose : t -> string -> (unit, err) Delayed_result.t
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
