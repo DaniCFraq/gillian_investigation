@@ -407,9 +407,6 @@ let substitution_in_place subst heap =
 
 let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
 
-let is_empty_or_freed t =
-  Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
-
 let assertions heap =
   Hashtbl.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
 

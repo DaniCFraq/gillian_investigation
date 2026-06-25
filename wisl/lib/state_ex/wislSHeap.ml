@@ -359,9 +359,6 @@ let to_seq heap =
 let is_empty ?freed_is_empty t =
   Hashtbl.to_seq_values t |> Seq.for_all (Block.is_empty ?freed_is_empty)
 
-let is_empty_or_freed t =
-  Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
-
 (***** Clean-up *****)
 
 let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
