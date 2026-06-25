@@ -28,11 +28,6 @@ module Block = struct
     | Freed -> false
     | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
 
-  let is_empty_or_freed t =
-    match t with
-    | Freed -> true
-    | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
-
   let substitution ~partial subst block =
     match block with
     | Freed -> Freed
@@ -190,7 +185,7 @@ let set_cell ~alloc_if_missing heap loc ofs v =
         | Some n ->
             let n = Expr.int n in
             let open Expr.Infix in
-            if%sat n <= ofs then error (OutOfBounds (bound, loc, ofs)) else ok ()
+            if%sat n <= ofs then error (UseAfterFree loc) else ok ()
       in
       let* { pfs; gamma; matching } = Delayed.leak_pc_copy () in
       let equality_test = Solver.is_equal ~matching ~pfs ~gamma in
@@ -364,7 +359,7 @@ let to_seq heap =
 let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
 
 let is_empty_or_freed t =
-  Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty_or_freed
+  Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
 
 (***** Clean-up *****)
 

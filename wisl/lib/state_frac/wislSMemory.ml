@@ -220,7 +220,7 @@ let get_recovery_tactic _ e =
   | _ -> Recovery_tactic.none
 
 let add_debugger_variables = WislSHeap.add_debugger_variables
-let sure_is_nonempty = Fun.negate WislSHeap.is_empty_or_freed
+let sure_is_nonempty = Fun.negate WislSHeap.is_empty
 let split_further _ _ _ _ = None
 let get_failing_constraint _ = Expr.true_
 

@@ -1,0 +1,34 @@
+predicate list(+x, alpha) {
+    (x == null) * (alpha == nil);
+    (x -> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
+}
+
+{ (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
+function concat(x, y) {
+    if (x == null) {
+        r := y
+    } else {
+        t := [x+1];
+        ct := concat(t, y);
+        [x+1] := ct;
+        r := x
+    };
+    return r
+}
+{ list(ret, #alpha @ #beta) }
+
+
+{ (x == #x) * list(#x, #alpha) }
+function reverse(x) {
+    if (x == null) {
+        r := null                 // rev [] = []
+    } else {
+        v := [x];                 // a   (head value)
+        t := [x+1];               // l   (tail pointer)
+        rt := reverse(t);         // rev l
+        [x+1] := null;            // turn node x into the singleton list [a]
+        r := concat(rt, x)        // rev l @ [a]
+    };
+    return r
+}
+{ list(ret, rev #alpha) }
