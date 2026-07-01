@@ -311,8 +311,8 @@ struct
             State.pp_by_need pvars lvars locs
       in
       ConfigReport.log state_printer
-        (ConfigReport.make ~proc_name ~proc_line:i ~time:(Sys.time ()) ~cmd
-           ~callstack:cs ~annot ~branching:b_counter ~state ?branch_case ())
+        (ConfigReport.make ~proc_name ~proc_line:i ~time:(Unix.gettimeofday ())
+           ~cmd ~callstack:cs ~annot ~branching:b_counter ~state ?branch_case ())
 
     let print_lconfiguration
         (lcmd : LCmd.t)
@@ -328,7 +328,8 @@ struct
              @\n\
              %a@\n\
              ------------------------------------------------------@]@\n"
-            (Sys.time ()) LCmd.pp lcmd Location.pp_log_opt loc State.pp state)
+            (Unix.gettimeofday ()) LCmd.pp lcmd Location.pp_log_opt loc State.pp
+            state)
 
     let pp_err = Exec_err.pp Val.pp State.pp_err
     let pp_single_result ft res = Exec_res.pp State.pp Val.pp pp_err ft res
@@ -453,12 +454,13 @@ struct
       raise (Interpreter_error (List.map (fun x -> Exec_err.EState x) errs, s))
 
   let check_loop_ids actual expected =
-    match actual = expected with
-    | false ->
-        Fmt.failwith
-          "Malformed loop structure: current loops: %a; expected loops: %a"
-          pp_str_list actual pp_str_list expected
-    | true -> ()
+    if
+      Exec_mode.is_verification_exec !Config.current_exec_mode
+      && actual <> expected
+    then
+      Fmt.failwith
+        "Malformed loop structure: current loops: %a; expected loops: %a"
+        pp_str_list actual pp_str_list expected
 
   let rec loop_ids_to_frame_on_at_the_end end_ids start_ids =
     if end_ids = start_ids then []
@@ -850,36 +852,26 @@ struct
           in
           L.verbose (fun fmt ->
               fmt "Run_spec returned %d Results" (List.length ret));
-          if ret = [] then
-            if spec.data.spec_incomplete then (
-              L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
-              symb_exec_proc ())
-            else
-              [
-                eval_state_to_err ~error_state:state
-                  ~errors:
-                    [
-                      EState
-                        (EOther
-                           (Fmt.str "Unable to use specification of function %s"
-                              spec.data.spec_name));
-                    ]
-                  eval_state;
-              ]
+          let successes, errors =
+            List.partition_map
+              (function
+                | Ok x -> Left x
+                | Error x -> Right (Exec_err.EState x))
+              ret
+          in
+          if errors != [] && spec.data.spec_incomplete then (
+            L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
+            symb_exec_proc ())
           else
-            let successes, errors =
-              List.partition_map
-                (function
-                  | Ok x -> Left x
-                  | Error x -> Right (Exec_err.EState x))
-                ret
-            in
             let spec_name = spec.data.spec_name in
+            let b_counter =
+              eval_state.b_counter + if List.is_empty successes then 0 else 1
+            in
             let success_confs =
               successes
               |> List.mapi (fun ix (ret_state, fl) ->
-                     process_ret pid j eval_state ix ret_state fl
-                       (eval_state.b_counter + 1) true spec_name)
+                     process_ret pid j eval_state ix ret_state fl b_counter true
+                       spec_name)
             in
             let error_confs =
               match errors with

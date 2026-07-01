@@ -1,11 +1,18 @@
 (** Interface for GIL Predicate States. They are considered to be mutable. *)
 module type S = sig
-  include SState.S
-
   type state_t
-  type abs_t = string * vt list
+  type abs_t = string * SVal.M.t list
 
   module SMatcher : Matcher.S with type state_t = state_t
+
+  type t = SMatcher.t = {
+    state : state_t;
+    preds : Preds.t;
+    wands : Wands.t;
+    pred_defs : MP.preds_tbl_t;
+  }
+
+  include SState.S with type t := t
 
   val make_p :
     preds:MP.preds_tbl_t ->
@@ -17,6 +24,17 @@ module type S = sig
     unit ->
     t
 
+  val make_p_from_heap :
+    pred_defs:MP.preds_tbl_t ->
+    store:store_t ->
+    heap:heap_t ->
+    spec_vars:SS.t ->
+    wands:Wands.t ->
+    preds:Preds.t ->
+    pfs:PFS.t ->
+    gamma:Type_env.t ->
+    t
+
   val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
@@ -24,6 +42,8 @@ module type S = sig
 
   (** Set preds of given symbolic state *)
   val set_preds : t -> Preds.t -> t
+
+  val get_wands : t -> Wands.t
 
   (** Set preds of given symbolic state *)
   val set_wands : t -> Wands.t -> t
@@ -115,6 +135,21 @@ module Make (State : SState.S) :
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
     { state; preds = Preds.init []; wands = Wands.init []; pred_defs = preds }
 
+  let make_s_from_heap ~heap:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ =
+    failwith "Calling make_s_from_heap on SState"
+
+  let make_p_from_heap
+      ~pred_defs
+      ~store
+      ~heap
+      ~spec_vars
+      ~wands
+      ~preds
+      ~pfs
+      ~gamma =
+    let sstate = State.make_s_from_heap ~store ~heap ~spec_vars ~pfs ~gamma in
+    { state = sstate; preds; wands; pred_defs }
+
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
 
@@ -146,6 +181,7 @@ module Make (State : SState.S) :
   let get_preds (astate : t) : Preds.t = astate.preds
   let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
   let set_wands astate wands = { astate with wands }
+  let get_wands (astate : t) : Wands.t = astate.wands
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in
@@ -231,9 +267,13 @@ module Make (State : SState.S) :
     |> SS.union (Wands.get_lvars wands)
 
   let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t =
-    let { state; preds; wands; _ } = astate in
+    let { state; preds; wands; pred_defs; _ } = astate in
     let s_asrts = State.to_assertions ?to_keep state in
-    let p_asrts = Preds.to_assertions preds in
+    let split_ins_outs name args =
+      let pred = (MP.get_pred_def pred_defs name).pred in
+      (Pred.in_args pred args, Pred.out_args pred args)
+    in
+    let p_asrts = Preds.to_assertions ~split_ins_outs preds in
     let w_asrts = Wands.to_assertions wands in
     List.sort Asrt.compare (p_asrts @ s_asrts @ w_asrts)
 
@@ -408,7 +448,7 @@ module Make (State : SState.S) :
     let pred_ins =
       Hashtbl.fold
         (fun name (pred : Pred.t) pred_ins ->
-          Hashtbl.add pred_ins name pred.pred_ins;
+          Hashtbl.add pred_ins name (Pred.ins_indexes pred);
           pred_ins)
         prog.prog.preds
         (Hashtbl.create Config.medium_tbl_size)
@@ -582,7 +622,7 @@ module Make (State : SState.S) :
     let pred_ins =
       Hashtbl.fold
         (fun name (pred : Pred.t) pred_ins ->
-          Hashtbl.add pred_ins name pred.pred_ins;
+          Hashtbl.add pred_ins name (Pred.ins_indexes pred);
           pred_ins)
         prog.prog.preds
         (Hashtbl.create Config.medium_tbl_size)
@@ -594,22 +634,25 @@ module Make (State : SState.S) :
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
     let vars_to_forget = SS.inter state_lvars (SS.of_list lvar_binders) in
-    if vars_to_forget <> SS.empty then (
-      let oblivion_subst = fresh_subst vars_to_forget in
-      L.verbose (fun m ->
-          m "Forget @[%a@] with subst: %a"
-            Fmt.(iter ~sep:comma SS.iter string)
-            vars_to_forget SVal.SESubst.pp oblivion_subst);
+    let astate =
+      if vars_to_forget <> SS.empty then (
+        let oblivion_subst = fresh_subst vars_to_forget in
+        L.verbose (fun m ->
+            m "Forget @[%a@] with subst: %a"
+              Fmt.(iter ~sep:comma SS.iter string)
+              vars_to_forget SVal.SESubst.pp oblivion_subst);
 
-      (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
-      let subst_in_place =
-        substitution_in_place ~subst_all:true oblivion_subst astate
-      in
-      assert (List.length subst_in_place = 1);
-      let astate = List.hd subst_in_place in
+        (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
+        let subst_in_place =
+          substitution_in_place ~subst_all:true oblivion_subst astate
+        in
+        assert (List.length subst_in_place = 1);
+        let astate = List.hd subst_in_place in
 
-      L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate))
-    else ();
+        L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate);
+        astate)
+      else astate
+    in
     let mp =
       match mp with
       | Error asrts ->
@@ -635,6 +678,7 @@ module Make (State : SState.S) :
     let open Res_list.Syntax in
     let open Syntaxes.List in
     let** new_state, subst', _ =
+      L.verbose (fun m -> m "State before matching:@\n@[%a@]\n" pp astate);
       let+ result = SMatcher.match_ astate subst mp Invariant in
       match result with
       | Ok state -> Ok state
@@ -909,7 +953,7 @@ module Make (State : SState.S) :
           let pred_ins =
             Hashtbl.fold
               (fun name (pred : Pred.t) pred_ins ->
-                Hashtbl.add pred_ins name pred.pred_ins;
+                Hashtbl.add pred_ins name (Pred.ins_indexes pred);
                 pred_ins)
               prog.prog.preds
               (Hashtbl.create Config.medium_tbl_size)

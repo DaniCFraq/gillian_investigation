@@ -90,7 +90,7 @@ let check_satisfiability
     ?relevant_info
     (fs : Expr.t list)
     (gamma : Type_env.t) : bool =
-  (* let t = if time = "" then 0. else Sys.time () in *)
+  (* let t = if time = "" then 0. else Unix.gettimeofday () in *)
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ = simplify_pfs_and_gamma ?relevant_info ~matching fs gamma in
   let axioms = get_axioms fs gamma in
@@ -99,10 +99,14 @@ let check_satisfiability
   if Expr.Set.is_empty fs then true
   else if Expr.Set.mem Expr.false_ fs then false
   else
-    let result = Smt.is_sat fs (Type_env.as_hashtbl gamma) in
+    let result =
+      try Smt.is_sat fs (Type_env.as_hashtbl gamma)
+      with Smt.SMT_error _ | Smt.SMT_unknown ->
+        if !Config.under_approximation then false else raise Smt.SMT_unknown
+    in
     (* if time <> "" then
        Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
-         (Sys.time () -. t); *)
+         (Unix.gettimeofday () -. t); *)
     result
 
 let sat ~matching ~pfs ~gamma formula : bool =
@@ -150,7 +154,7 @@ let check_entailment
   (* SOUNDNESS !!DANGER!!: call to simplify_implication       *)
   (* Simplify maximally the implication to be checked         *)
   (* Remove from the typing environment the unused variables  *)
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let left_fs = PFS.copy left_fs in
   let gamma = Type_env.copy gamma in
   let right_fs = PFS.of_list right_fs in
@@ -226,11 +230,11 @@ let check_entailment
                L.tmi (fun m -> m "Here's the model:\n%a" Smt.pp_sexp model))
       in
       (* Utils.Statistics.update_statistics "FOS: CheckEntailment"
-         (Sys.time () -. t); *)
+         (Unix.gettimeofday () -. t); *)
       ret
 
 let is_equal ?matching ~pfs ~gamma e1 e2 =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let feq =
     Reduction.reduce_lexpr ?matching ~gamma ~pfs (BinOp (e1, Equal, e2))
   in
@@ -245,11 +249,11 @@ let is_equal ?matching ~pfs ~gamma e1 e2 =
              ("Equality reduced to something unexpected: "
              ^ (Fmt.to_to_string Expr.pp) feq))
   in
-  (* Utils.Statistics.update_statistics "FOS: is_equal" (Sys.time () -. t); *)
+  (* Utils.Statistics.update_statistics "FOS: is_equal" (Unix.gettimeofday () -. t); *)
   result
 
 let is_different ~pfs ~gamma e1 e2 =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let feq =
     Reduction.reduce_lexpr ~gamma ~pfs (UnOp (Not, BinOp (e1, Equal, e2)))
   in
@@ -263,7 +267,7 @@ let is_different ~pfs ~gamma e1 e2 =
              ("Inequality reduced to something unexpected: "
              ^ (Fmt.to_to_string Expr.pp) feq))
   in
-  (* Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t); *)
+  (* Utils.Statistics.update_statistics "FOS: is different" (Unix.gettimeofday () -. t); *)
   result
 
 let num_is_less_or_equal ~pfs ~gamma e1 e2 =

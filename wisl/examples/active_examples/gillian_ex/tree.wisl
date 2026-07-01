@@ -1,4 +1,4 @@
-predicate tree(+t) {
+predicate tree(t) {
     (t == null);
     (t -b> #v, #left, #right) * tree(#left) * tree(#right)
 }
@@ -10,7 +10,7 @@ function tree_dispose(x) {
     z := [x+2];
     u := tree_dispose(y);
     u := tree_dispose(z);
-    dispose(x)
+    free(x)
   } else {
     skip
   };

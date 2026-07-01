@@ -14,19 +14,36 @@ let rec auto_unfold
     (predicates : (string, Pred.t) Hashtbl.t)
     (rec_tbl : (string, bool) Hashtbl.t)
     (asrt : Asrt.t) : Asrt.t list =
+  let should_not_unfold name =
+    (* We don't unfold:
+       - Recursive predicates (except in some very specific cases)
+       - predicates marked with no-unfold
+       - predicates with a guard *)
+    (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
+    ||
+    let pred = Hashtbl.find predicates name in
+    pred.pred_nounfold || Option.is_some pred.pred_guard
+  in
+  (* The original first arm's guard: a user predicate we must keep folded. *)
+  let must_keep_folded cp_name =
+    match Asrt.as_user_pred_name cp_name with
+    | Some name -> should_not_unfold name
+    | None -> false
+  in
+  (* The original second arm's guard: the assertion is a user predicate. *)
+  let is_user_pred cp_name = Option.is_some (Asrt.as_user_pred_name cp_name) in
+  (* The user predicate has already been unfolded (it is in [unfolded_preds]). *)
+  let is_already_unfolded cp_name =
+    match Asrt.as_user_pred_name cp_name with
+    | Some name -> Hashtbl.mem unfolded_preds name
+    | None -> false
+  in
   asrt
   |> List.map (function
-       (* We don't unfold:
-           - Recursive predicates (except in some very specific cases)
-           - predicates marked with no-unfold
-           - predicates with a guard *)
-       | Asrt.Pred (name, _) as asrt
-         when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
-              ||
-              let pred = Hashtbl.find predicates name in
-              pred.pred_nounfold || Option.is_some pred.pred_guard ->
-           [ [ asrt ] ]
-       | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
+       | Asrt.CorePred (cp_name, ins, outs) as asrt
+         when (not (must_keep_folded cp_name)) && is_already_unfolded cp_name ->
+           let name = Option.get (Asrt.as_user_pred_name cp_name) in
+           let args = ins @ outs in
            L.verbose (fun fmt ->
                fmt "Unfolding predicate: %s with nounfold %b" name
                  (Hashtbl.find predicates name).pred_nounfold);
@@ -51,12 +68,14 @@ let rec auto_unfold
              List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
            in
            L.tmi (fun m ->
-               m "%a ->\n%a" Asrt.pp_atom
-                 (Asrt.Pred (name, args))
+               m "%a ->\n%a" Asrt.pp_atom asrt
                  (Fmt.list ~sep:(Fmt.any "\n;\n") Asrt.pp)
                  asrts);
            asrts
-       | Pred (name, args) as asrt -> (
+       | Asrt.CorePred (cp_name, ins, outs) as asrt
+         when (not (must_keep_folded cp_name)) && is_user_pred cp_name -> (
+           let name = Option.get (Asrt.as_user_pred_name cp_name) in
+           let args = ins @ outs in
            try
              L.tmi (fun fmt -> fmt "AutoUnfold: %a : %s" Asrt.pp_atom asrt name);
              let pred : Pred.t = Hashtbl.find predicates name in
@@ -631,7 +650,6 @@ let add_closing_tokens preds =
       let pred_name = Pred.close_token_name pred in
       let pred_params = Pred.in_args pred pred.pred_params in
       let pred_num_params = List.length pred_params in
-      let pred_ins = List.init pred_num_params Fun.id in
       let close_token =
         Pred.
           {
@@ -641,7 +659,7 @@ let add_closing_tokens preds =
             pred_internal = false;
             pred_num_params;
             pred_params;
-            pred_ins;
+            ins_number = pred_num_params;
             pred_facts = [];
             pred_definitions = [];
             pred_guard = None;

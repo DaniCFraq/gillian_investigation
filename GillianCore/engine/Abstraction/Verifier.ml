@@ -4,15 +4,12 @@ module DL = Debugger_log
 
 module type S = sig
   type heap_t
-  type state
   type m_err
   type annot
 
-  module SPState :
-    PState.S
-      with type t = state
-       and type heap_t = heap_t
-       and type m_err_t = m_err
+  module SPState : PState.S with type heap_t = heap_t and type m_err_t = m_err
+
+  type state = SPState.t
 
   module SState :
     SState.S with type t = SPState.state_t and type heap_t = heap_t
@@ -123,7 +120,7 @@ struct
       |> List.map (fun (name, test) -> `List [ `String name; to_yojson test ]))
 
   let global_results = VerificationResults.make ()
-  let start_time = ref 0.
+  let start_time = ref (Unix.gettimeofday ())
 
   let reset () =
     VerificationResults.reset global_results;
@@ -631,7 +628,7 @@ struct
     match test.flag with
     | Some _ ->
         let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
-        L.tmi (fun fmt -> fmt "%s" msg);
+        L.normal (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s@?" msg;
         (* Reset coverage for every procedure in verification *)
         { prog with coverage = Hashtbl.create 1 }
@@ -664,7 +661,7 @@ struct
             else Ok () (* It's already correct *)
         | Some proof -> (
             let msg = "Verifying lemma " ^ test.name ^ "... " in
-            L.tmi (fun fmt -> fmt "%s" msg);
+            L.normal (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
             let lemma_evaluation_results =
               SAInterpreter.evaluate_lcmds prog proof state
@@ -686,7 +683,12 @@ struct
     object
       inherit [_] Visitors.reduce
       inherit Visitors.Utils.ss_monoid
-      method! visit_Pred _ pred_name _ = SS.singleton pred_name
+
+      method! visit_CorePred _ name _ _ =
+        match Asrt.as_user_pred_name name with
+        | Some pred_name -> SS.singleton pred_name
+        | None -> SS.empty
+
       method! visit_Fold _ pred_name _ _ = SS.singleton pred_name
       method! visit_Unfold _ pred_name _ _ _ = SS.singleton pred_name
       method! visit_GUnfold _ pred_name = SS.singleton pred_name
@@ -778,7 +780,7 @@ struct
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : MP.pred) pred_ins ->
-              Hashtbl.add pred_ins name pred.pred.pred_ins;
+              Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
               pred_ins)
             preds
             (Hashtbl.create Config.medium_tbl_size)
@@ -870,7 +872,7 @@ struct
       get_tests_to_verify ~init_data prog pnames_to_verify lnames_to_verify
     in
     (* STEP 6: Run the symbolic tests *)
-    let cur_time = Sys.time () in
+    let cur_time = Unix.gettimeofday () in
     Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
     let result =
       let rec aux = function
@@ -882,7 +884,7 @@ struct
       in
       aux (tests' @ tests, Ok ())
     in
-    let end_time = Sys.time () in
+    let end_time = Unix.gettimeofday () in
     let cur_verified = SS.union pnames_to_verify lnames_to_verify in
     let success =
       Result.is_ok result && check_previously_verified prev_results cur_verified
@@ -1027,7 +1029,7 @@ struct
       let pred_ins =
         Hashtbl.fold
           (fun name (pred : MP.pred) pred_ins ->
-            Hashtbl.add pred_ins name pred.pred.pred_ins;
+            Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
             pred_ins)
           preds
           (Hashtbl.create Config.medium_tbl_size)

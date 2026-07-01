@@ -8,7 +8,7 @@ module Recovery_tactic = Gillian.General.Recovery_tactic
 type t = Expr.t option [@@deriving yojson]
 type err_t = MissingState [@@deriving show, yojson]
 type action = Load
-type pred = Ag
+type pred = Ag [@@deriving yojson]
 
 let pp = Fmt.(option ~none:(any "None") Expr.pp)
 
@@ -94,7 +94,7 @@ let assertions = function
 
 let assertions_others _ = []
 
-let get_recovery_tactic (e : err_t) : Values.t Recovery_tactic.t =
+let get_recovery_tactic _ (e : err_t) : Values.t Recovery_tactic.t =
   match e with
   (* | MissingState -> Recovery_tactic.try_unfold ??? *)
   | _ -> Recovery_tactic.none
@@ -103,5 +103,4 @@ let can_fix = function
   | MissingState -> true
 
 let get_fixes = function
-  | MissingState ->
-      [ [ MyAsrt.CorePred (Ag, [], [ LVar (Generators.fresh_svar ()) ]) ] ]
+  | MissingState -> [ [ (Ag, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]

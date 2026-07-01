@@ -86,8 +86,7 @@ module ExtendMemory (S : OpenPMapType with module Entry = BaseBlock) = struct
       | _ -> false
 
     let map_fixes mapper =
-      States.MyUtils.deep_map
-        (States.MyAsrt.map_cp (fun (p, i, o) -> (mapper p, i, o)))
+      States.MyUtils.deep_map (fun (p, i, o) -> (mapper p, i, o))
 
     let get_fixes = function
       | BaseError e -> S.get_fixes e |> map_fixes S.pred_to_str
@@ -95,8 +94,8 @@ module ExtendMemory (S : OpenPMapType with module Entry = BaseBlock) = struct
           BlockTree.get_fixes e |> map_fixes BlockTree.pred_to_str
       | _ -> []
 
-    let get_recovery_tactic = function
-      | BaseError e -> S.get_recovery_tactic e
+    let get_recovery_tactic s = function
+      | BaseError e -> S.get_recovery_tactic s e
       | BlockTreeErr (dest_idx, src_idx, _) ->
           Gillian.General.Recovery_tactic.try_unfold [ dest_idx; src_idx ]
       | _ -> Gillian.General.Recovery_tactic.none
@@ -147,7 +146,7 @@ module ExternalSemantics =
 module InitData = Cgil_lib.Global_env
 
 module MyInitData = struct
-  type t = InitData.t
+  type t = InitData.t [@@deriving yojson]
 
   let init = C_states.CGEnv.set_init_data
 end

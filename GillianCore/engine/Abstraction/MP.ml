@@ -529,16 +529,6 @@ let ins_outs_assertion
   | Emp -> []
   | Pure form -> ins_outs_formula kb form
   | CorePred (_, lie, loe) -> ins_and_outs_from_lists kb lie loe
-  | Pred (p_name, args) ->
-      let p_ins = get_pred_ins p_name in
-      let _, lie, loe =
-        List.fold_left
-          (fun (i, lie, loe) arg ->
-            if List.mem i p_ins then (i + 1, lie @ [ arg ], loe)
-            else (i + 1, lie, loe @ [ arg ]))
-          (0, [], []) args
-      in
-      ins_and_outs_from_lists kb lie loe
   (* The types assertion has no outs and requires all ins *)
   | Types [ (e, _) ] ->
       let ins = simple_ins_expr e in
@@ -560,7 +550,7 @@ let simplify_asrts ?(sorted = true) a =
     match a with
     | Pure (Lit (Bool true)) | Emp -> []
     | Pure (BinOp (f1, And, f2)) -> aux (Pure f1) @ aux (Pure f2)
-    | Pure _ | Pred _ | CorePred _ | Wand _ -> [ a ]
+    | Pure _ | CorePred _ | Wand _ -> [ a ]
     | Types _ -> (
         let a = Reduction.reduce_assertion [ a ] in
         match a with
@@ -825,7 +815,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
   let pred_ins =
     Hashtbl.fold
       (fun name (pred : Pred.t) pred_ins ->
-        Hashtbl.add pred_ins name pred.pred_ins;
+        Hashtbl.add pred_ins name (Pred.ins_indexes pred);
         pred_ins)
       preds
       (Hashtbl.create Config.medium_tbl_size)
@@ -840,7 +830,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
                (fun i ->
                  let param, _ = List.nth pred.pred_params i in
                  Expr.PVar param)
-               pred.pred_ins)
+               (Pred.ins_indexes pred))
         in
 
         let defs =
@@ -892,7 +882,7 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : 'a prog =
     let pred_ins =
       Hashtbl.fold
         (fun name (pred : pred) pred_ins ->
-          Hashtbl.add pred_ins name pred.pred.pred_ins;
+          Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
           pred_ins)
         preds
         (Hashtbl.create Config.medium_tbl_size)
@@ -939,15 +929,19 @@ let pp_asrt
     (fmt : Format.formatter)
     (a : Asrt.t) =
   let pp_atom_asrt fmt = function
-    | Asrt.Pred (name, args) -> (
+    | Asrt.CorePred (cp_name, ins, outs)
+      when Option.is_some (Asrt.as_user_pred_name cp_name) -> (
+        let name = Option.get (Asrt.as_user_pred_name cp_name) in
+        let args = ins @ outs in
         match preds_printer with
         | Some pp_pred -> (Fmt.hbox pp_pred) fmt (name, args)
         | None -> (
             try
               let pred = get_pred_def preds name in
+              (* The in/out split is carried by the assertion itself. *)
               let out_params = Pred.out_params pred.pred in
-              let out_args = Pred.out_args pred.pred args in
-              let in_args = Pred.in_args pred.pred args in
+              let out_args = outs in
+              let in_args = ins in
               let out_params_args = List.combine out_params out_args in
               let pp_out_params_args fmt (x, e) =
                 Fmt.pf fmt "@[<h>%s: %a@]" x Expr.pp e
@@ -1018,7 +1012,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
   let pred_ins =
     Hashtbl.fold
       (fun name (pred : pred) pred_ins ->
-        Hashtbl.add pred_ins name pred.pred.pred_ins;
+        Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
         pred_ins)
       prog.preds
       (Hashtbl.create Config.medium_tbl_size)

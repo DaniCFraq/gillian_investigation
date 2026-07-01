@@ -155,7 +155,6 @@ and expr =
 
 and assertion_atom =
   | Emp
-  | Pred of string * expr list
   | Pure of expr
   | Types of (expr * typ) list
   | CorePred of string * expr list * expr list
@@ -220,7 +219,7 @@ and pred = {
   pred_internal : bool;
   pred_num_params : int;
   pred_params : (string * typ option) list;
-  pred_ins : int list;
+  ins_number : int;
   pred_definitions : ((string * string list) option * assertion) list;
   pred_facts : expr list;
   pred_guard : assertion option;

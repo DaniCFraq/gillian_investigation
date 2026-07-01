@@ -37,7 +37,7 @@ module Make (S : MyMonadicSMemory.S) :
       (fun (a, args, ret) -> (SubAction a, "offset" :: args, ret))
       (S.list_actions ())
 
-  type pred = Length | SubPred of S.pred
+  type pred = Length | SubPred of S.pred [@@deriving yojson]
 
   let pred_from_str = function
     | "length" -> Some Length
@@ -112,7 +112,9 @@ module Make (S : MyMonadicSMemory.S) :
     | Length, [ n' ] -> (
         match n with
         | Some _ -> Delayed.vanish ()
-        | None -> Delayed.return (b, Some n'))
+        | None ->
+            let+ () = Delayed.assume_types [ (n', Type.IntType) ] in
+            (b, Some n'))
     | Length, _ -> failwith "Invalid arguments for length produce"
 
   let compose s1 s2 =
@@ -215,11 +217,16 @@ module Make (S : MyMonadicSMemory.S) :
   let assertions_others (b, _) =
     List.concat_map (fun (_, v) -> S.assertions_others v) (ExpMap.bindings b)
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (idx, e) ->
+        let sub_recover =
+          match ExpMap.find_opt idx (fst st) with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
         Gillian.General.Recovery_tactic.merge
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
-          (S.get_recovery_tactic e)
+          sub_recover
     | _ -> Gillian.General.Recovery_tactic.none
 
   let can_fix = function
@@ -228,15 +235,9 @@ module Make (S : MyMonadicSMemory.S) :
     | OutOfBounds _ -> false
 
   let get_fixes = function
-    | SubError (idx, e) ->
-        S.get_fixes e |> MyUtils.deep_map (MyAsrt.map_cp (lift_corepred idx))
+    | SubError (idx, e) -> S.get_fixes e |> MyUtils.deep_map (lift_corepred idx)
     | MissingLength ->
         let lvar = Expr.LVar (LVar.alloc ()) in
-        [
-          [
-            MyAsrt.CorePred (Length, [], [ lvar ]);
-            MyAsrt.Types [ (lvar, Type.IntType) ];
-          ];
-        ]
+        [ [ (Length, [], [ lvar ]) ] ]
     | _ -> failwith "Called get_fixes on unfixable error"
 end

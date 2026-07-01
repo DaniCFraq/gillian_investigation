@@ -311,7 +311,7 @@ let simplify_pfs_and_gamma
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
     (gamma : Type_env.t) : SESubst.t * SS.t =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
   let existentials : SS.t ref =
     ref (Option.value ~default:SS.empty existentials)
@@ -705,6 +705,25 @@ let simplify_pfs_and_gamma
                     | Some tv ->
                         if t <> tv then stop_explain "Type mismatch"
                         else `Filter)
+                (* Int breakdown *)
+                | ( Lit (Num n),
+                    BinOp (l, FPlus, BinOp (Lit (Num 256.), FTimes, r)) )
+                  when PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, l))
+                       && PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, r))
+                       && PFS.mem pfs (BinOp (l, FLessThan, Lit (Num 256.)))
+                       && PFS.mem pfs (BinOp (r, FLessThan, Lit (Num 256.))) ->
+                    let n = int_of_float n in
+                    let eq_l =
+                      Expr.BinOp (l, Equal, Lit (Num (float_of_int (n mod 256))))
+                    in
+                    let eq_r =
+                      Expr.BinOp (r, Equal, Lit (Num (float_of_int (n / 256))))
+                    in
+                    L.verbose (fun fmt ->
+                        fmt "Breakdown:\n\tn : %d\n\tl : %a\n\tr : %a" n Expr.pp
+                          eq_l Expr.pp eq_r);
+                    extend_with eq_l;
+                    `Replace eq_r
                 | _, _ -> `Replace whole))
         (* All other cases *)
         | _ -> `Replace whole
@@ -947,7 +966,7 @@ let simplify_pfs_and_gamma
       Hashtbl.replace simplification_cache key cached_simplification;
 
       (* Utils.Statistics.update_statistics "FOS: SimplifyPFSandGamma"
-         (Sys.time () -. t); *)
+         (Unix.gettimeofday () -. t); *)
 
       (* Step 5 - Sort ALoc transitivity *)
       let rec find_loc_all_the_way aloc res =
@@ -983,7 +1002,7 @@ let simplify_implication
     (lpfs : PFS.t)
     (rpfs : PFS.t)
     (gamma : Type_env.t) =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   List.iter
     (fun (pf : Expr.t) ->
       match pf with
@@ -1026,7 +1045,7 @@ let simplify_implication
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           exists PFS.pp lpfs PFS.pp rpfs Type_env.pp gamma));
   (* Utils.Statistics.update_statistics "FOS: SimplifyImplication"
-     (Sys.time () -. t); *)
+     (Unix.gettimeofday () -. t); *)
   exists
 
 let admissible_assertion (a : Asrt.t) : bool =

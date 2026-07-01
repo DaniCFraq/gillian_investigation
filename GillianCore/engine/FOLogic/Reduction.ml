@@ -943,28 +943,56 @@ let rec reduce_binop_inttonum_const
   let open Utils.Syntaxes.Option in
   let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
   match (l, r) with
-  | Lit (Num x), UnOp (IntToNum, e) | UnOp (IntToNum, e), Lit (Num x) ->
+  | Lit (Num x), UnOp (IntToNum, e) -> (
       let* () = if snd (modf x) = 0.0 then Some () else None in
       let l = Expr.Lit (Int (Z.of_float x)) in
       let r = f e in
-      let+ op =
+      let+ wrap, op =
         BinOp.(
           match op with
-          | Equal -> Some Equal
-          | FLessThan -> Some ILessThan
-          | FLessThanEqual -> Some ILessThanEqual
-          | FPlus -> Some IPlus
-          | FMinus -> Some IMinus
-          | FTimes -> Some ITimes
-          | BitwiseAndF -> Some BitwiseAnd
-          | BitwiseOrF -> Some BitwiseOr
-          | BitwiseXorF -> Some BitwiseXor
-          | LeftShiftF -> Some LeftShiftF
-          | SignedRightShiftF -> Some SignedRightShift
-          | UnsignedRightShiftF -> Some UnsignedRightShift
+          | Equal -> Some (false, Equal)
+          | FLessThan -> Some (false, ILessThan)
+          | FLessThanEqual -> Some (false, ILessThanEqual)
+          | FPlus -> Some (true, IPlus)
+          | FMinus -> Some (true, IMinus)
+          | FTimes -> Some (true, ITimes)
+          | BitwiseAndF -> Some (true, BitwiseAnd)
+          | BitwiseOrF -> Some (true, BitwiseOr)
+          | BitwiseXorF -> Some (true, BitwiseXor)
+          | LeftShiftF -> Some (true, LeftShiftF)
+          | SignedRightShiftF -> Some (true, SignedRightShift)
+          | UnsignedRightShiftF -> Some (true, UnsignedRightShift)
           | _ -> None)
       in
-      Expr.BinOp (l, op, r)
+      let res = Expr.BinOp (l, op, r) in
+      match wrap with
+      | true -> Expr.UnOp (IntToNum, res)
+      | false -> res)
+  | UnOp (IntToNum, e), Lit (Num x) -> (
+      let* () = if snd (modf x) = 0.0 then Some () else None in
+      let r = Expr.Lit (Int (Z.of_float x)) in
+      let l = f e in
+      let+ wrap, op =
+        BinOp.(
+          match op with
+          | Equal -> Some (false, Equal)
+          | FLessThan -> Some (false, ILessThan)
+          | FLessThanEqual -> Some (false, ILessThanEqual)
+          | FPlus -> Some (true, IPlus)
+          | FMinus -> Some (true, IMinus)
+          | FTimes -> Some (true, ITimes)
+          | BitwiseAndF -> Some (true, BitwiseAnd)
+          | BitwiseOrF -> Some (true, BitwiseOr)
+          | BitwiseXorF -> Some (true, BitwiseXor)
+          | LeftShiftF -> Some (true, LeftShiftF)
+          | SignedRightShiftF -> Some (true, SignedRightShift)
+          | UnsignedRightShiftF -> Some (true, UnsignedRightShift)
+          | _ -> None)
+      in
+      let res = Expr.BinOp (l, op, r) in
+      match wrap with
+      | true -> Expr.UnOp (IntToNum, res)
+      | false -> res)
   | _ -> None
 
 (** Reduction of logical expressions
@@ -1176,7 +1204,25 @@ and reduce_lexpr_loop
         |> Option.get
     | LstSub (e1, Lit (Int z), e3)
       when Z.equal z Z.zero
-           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> check_reduction 012; e1
+           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> e1
+    | LstSub (e1, e2, e3)
+      when SS.inter (Expr.lvars e1) (Expr.lvars e3) = SS.empty
+           && List.length
+                (List.filter
+                   (fun e ->
+                     SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty)
+                   (get_equal_expressions pfs e1))
+              > 0 ->
+        let eqs = get_equal_expressions pfs e1 in
+        let e1' =
+          List.hd
+            (List.filter
+               (fun e -> SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty)
+               eqs)
+        in
+        L.verbose (fun fmt ->
+            fmt "Replacement LstSub: %a -> %a" Expr.pp e1 Expr.pp e1');
+        LstSub (e1', e2, e3)
     | LstSub (le1, le2, le3) -> (
         check_reduction 013;
         let fle1 = f le1 in
@@ -1447,12 +1493,51 @@ and reduce_lexpr_loop
     | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e))
     | UnOp (IUnaryMinus, UnOp (IUnaryMinus, e))
     | UnOp (LstLen, BinOp (_, LstRepeat, e))
-    | UnOp (LstLen, LstSub (_, _, e)) ->
-        check_reduction 014;
-        e
-    | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le)) ->
-        check_reduction 015;
-        le
+    | UnOp (LstLen, LstSub (_, _, e)) -> e
+    | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))
+      -> le
+    (* Conversions *)
+    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) ->
+        BinOp (UnOp (IntToNum, le1), FPlus, UnOp (IntToNum, le2))
+    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) ->
+        BinOp (UnOp (NumToInt, le1), IPlus, UnOp (NumToInt, le2))
+    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) ->
+        BinOp (UnOp (NumToInt, le1), ITimes, UnOp (NumToInt, le2))
+    | UnOp (IntToNum, UnOp (LstLen, x))
+      when List.length
+             (get_equal_expressions pfs (UnOp (LstLen, x))
+             |> List.filter (fun x ->
+                    match x with
+                    | Expr.UnOp (NumToInt, _) -> true
+                    | _ -> false))
+           = 1 -> (
+        L.verbose (fun fmt -> fmt "l-len conversion: %a" Expr.pp le);
+        let eqs =
+          get_equal_expressions pfs (UnOp (LstLen, x))
+          |> List.filter (fun x ->
+                 match x with
+                 | Expr.UnOp (NumToInt, _) -> true
+                 | _ -> false)
+        in
+        match List.hd eqs with
+        | UnOp (NumToInt, e) -> e
+        | _ -> raise (ReductionException (le, "Impossible")))
+    (* IsInt *)
+    | UnOp (IsInt, UnOp (IntToNum, _)) -> Lit (Bool true)
+    | UnOp (IsInt, Lit (Num n)) -> Lit (Bool (Float.is_integer n))
+    | UnOp (IsInt, BinOp (le', FPlus, re'))
+    | UnOp (IsInt, BinOp (le', FMinus, re'))
+    | UnOp (IsInt, BinOp (le', FTimes, re')) ->
+        let resl = f (UnOp (IsInt, le')) in
+        L.verbose (fun fmt ->
+            fmt "is_int_reduction: %a\n\tlhs: %a" Expr.pp le Expr.pp resl);
+        if resl = Lit (Bool true) || PFS.mem pfs resl then UnOp (IsInt, re')
+        else
+          let resr = f (UnOp (IsInt, re')) in
+          L.verbose (fun fmt -> fmt "\trhs: %a" Expr.pp resr);
+          if f (UnOp (IsInt, re')) = Lit (Bool true) || PFS.mem pfs resr then
+            UnOp (IsInt, le')
+          else le
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         check_reduction 016;
@@ -1873,11 +1958,17 @@ and reduce_lexpr_loop
       when Z.equal n Z.zero && not (Z.equal x Z.zero) -> check_reduction 064;
         BinOp (e, Equal, Expr.zero_i)
     | BinOp (BinOp (a, FTimes, b), FMod, c)
-      when Expr.equal a c || Expr.equal b c -> check_reduction 065; Expr.num 0.
-    | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> check_reduction 066; y
-    | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> check_reduction 067; x
-    | BinOp (UnOp (NumToInt, x), Equal, y) | BinOp (y, Equal, UnOp (NumToInt, x))
-      -> check_reduction 068; BinOp (UnOp (IntToNum, y), Equal, x)
+      when Expr.equal a c || Expr.equal b c -> Expr.num 0.
+    | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> y
+    | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> x
+    | BinOp (UnOp (NumToInt, x), Equal, y)
+      when match y with
+           | UnOp (LstLen, _) -> false
+           | _ -> true -> BinOp (UnOp (IntToNum, y), Equal, x)
+    | BinOp (y, Equal, UnOp (NumToInt, x))
+      when match y with
+           | UnOp (LstLen, _) -> false
+           | _ -> true -> BinOp (UnOp (IntToNum, y), Equal, x)
     (* BinOps: Equalities (strings) *)
     (* x = y ++ z
           /\ |x| < |y| => false
@@ -2430,9 +2521,9 @@ and reduce_lexpr
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (le : Expr.t) =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let result = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma le in
-  (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)
+  (* Utils.Statistics.update_statistics "Reduce Expression" (Unix.gettimeofday () -. t); *)
   if not @@ Expr.equal le result then
     Logging.normal (fun f ->
         f "reduce_lexpr: @[%a -> %a@]" Expr.pp le Expr.pp result);
@@ -2446,18 +2537,22 @@ and simplify_num_arithmetic_lexpr
   match le with
   | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> check_reduction 310; l
   (* Binary minus to unary minus *)
-  | BinOp (l, FMinus, r) -> check_reduction 311; f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
-  (* Unary minus distributes over + *)
+  | BinOp (l, FMinus, r) -> f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
+  (* Unary minus distributes over +, - *)
   | UnOp (FUnaryMinus, e) -> (
       match e with
       | BinOp (l, FPlus, r) ->
-          check_reduction 312; f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))
-      | _ -> check_reduction 312_1; le)
+          f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))
+      | BinOp (l, FMinus, r) -> f (BinOp (UnOp (FUnaryMinus, l), FPlus, r))
+      | _ -> le)
   (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, FPlus, r) ->
       check_reduction 313;
       let cl = Cnum.of_expr l in
       let cr = Cnum.of_expr r in
+      L.verbose (fun fmt ->
+          fmt "FPlus check:\n\t%a\t-->\t%a\n\t%a\t-->\t%a" Expr.pp l Expr.pp
+            (Cnum.to_expr cl) Expr.pp r Expr.pp (Cnum.to_expr cr));
       Cnum.to_expr (Cnum.plus cl cr)
   | _ -> check_reduction 314; le
 
@@ -2994,8 +3089,6 @@ let reduce_assertion_loop
               rhs = (rname, List.map fe rargs);
             };
         ]
-    (* Predicates *)
-    | Pred (name, les) -> [ Pred (name, List.map fe les) ]
     (* Pure assertions *)
     | Pure (Lit (Bool true)) -> []
     | Pure (BinOp (f1, BinOp.And, f2)) -> [ Pure f1; Pure f2 ]
