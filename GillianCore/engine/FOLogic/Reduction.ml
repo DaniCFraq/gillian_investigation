@@ -1204,7 +1204,7 @@ and reduce_lexpr_loop
         |> Option.get
     | LstSub (e1, Lit (Int z), e3)
       when Z.equal z Z.zero
-           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> e1
+           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> check_reduction 012_1; e1
     | LstSub (e1, e2, e3)
       when SS.inter (Expr.lvars e1) (Expr.lvars e3) = SS.empty
            && List.length
@@ -1212,7 +1212,7 @@ and reduce_lexpr_loop
                    (fun e ->
                      SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty)
                    (get_equal_expressions pfs e1))
-              > 0 ->
+              > 0 -> check_reduction 012_2;
         let eqs = get_equal_expressions pfs e1 in
         let e1' =
           List.hd
@@ -1493,15 +1493,15 @@ and reduce_lexpr_loop
     | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e))
     | UnOp (IUnaryMinus, UnOp (IUnaryMinus, e))
     | UnOp (LstLen, BinOp (_, LstRepeat, e))
-    | UnOp (LstLen, LstSub (_, _, e)) -> e
+    | UnOp (LstLen, LstSub (_, _, e)) -> check_reduction 014_1; e
     | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))
-      -> le
+      -> check_reduction 014_2; le
     (* Conversions *)
-    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) ->
+    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) -> check_reduction 014_3;
         BinOp (UnOp (IntToNum, le1), FPlus, UnOp (IntToNum, le2))
-    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) ->
+    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) -> check_reduction 014_4;
         BinOp (UnOp (NumToInt, le1), IPlus, UnOp (NumToInt, le2))
-    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) ->
+    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) -> check_reduction 014_5;
         BinOp (UnOp (NumToInt, le1), ITimes, UnOp (NumToInt, le2))
     | UnOp (IntToNum, UnOp (LstLen, x))
       when List.length
@@ -1520,14 +1520,14 @@ and reduce_lexpr_loop
                  | _ -> false)
         in
         match List.hd eqs with
-        | UnOp (NumToInt, e) -> e
-        | _ -> raise (ReductionException (le, "Impossible")))
+        | UnOp (NumToInt, e) -> check_reduction 014_6; e
+        | _ -> check_reduction 014_7; raise (ReductionException (le, "Impossible")))
     (* IsInt *)
-    | UnOp (IsInt, UnOp (IntToNum, _)) -> Lit (Bool true)
-    | UnOp (IsInt, Lit (Num n)) -> Lit (Bool (Float.is_integer n))
+    | UnOp (IsInt, UnOp (IntToNum, _)) -> check_reduction 014_8; Lit (Bool true)
+    | UnOp (IsInt, Lit (Num n)) -> check_reduction 014_9; Lit (Bool (Float.is_integer n))
     | UnOp (IsInt, BinOp (le', FPlus, re'))
     | UnOp (IsInt, BinOp (le', FMinus, re'))
-    | UnOp (IsInt, BinOp (le', FTimes, re')) ->
+    | UnOp (IsInt, BinOp (le', FTimes, re')) -> check_reduction 014_10;
         let resl = f (UnOp (IsInt, le')) in
         L.verbose (fun fmt ->
             fmt "is_int_reduction: %a\n\tlhs: %a" Expr.pp le Expr.pp resl);
@@ -1958,17 +1958,17 @@ and reduce_lexpr_loop
       when Z.equal n Z.zero && not (Z.equal x Z.zero) -> check_reduction 064;
         BinOp (e, Equal, Expr.zero_i)
     | BinOp (BinOp (a, FTimes, b), FMod, c)
-      when Expr.equal a c || Expr.equal b c -> Expr.num 0.
-    | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> y
-    | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> x
+      when Expr.equal a c || Expr.equal b c -> check_reduction 065; Expr.num 0.
+    | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> check_reduction 066; y
+    | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> check_reduction 067; x
     | BinOp (UnOp (NumToInt, x), Equal, y)
       when match y with
-           | UnOp (LstLen, _) -> false
-           | _ -> true -> BinOp (UnOp (IntToNum, y), Equal, x)
+           | UnOp (LstLen, _) -> check_reduction 068_11; false
+           | _ -> check_reduction 068_12; true -> BinOp (UnOp (IntToNum, y), Equal, x)
     | BinOp (y, Equal, UnOp (NumToInt, x))
       when match y with
-           | UnOp (LstLen, _) -> false
-           | _ -> true -> BinOp (UnOp (IntToNum, y), Equal, x)
+           | UnOp (LstLen, _) -> check_reduction 068_21; false
+           | _ -> check_reduction 068_22; true -> BinOp (UnOp (IntToNum, y), Equal, x)
     (* BinOps: Equalities (strings) *)
     (* x = y ++ z
           /\ |x| < |y| => false
@@ -2537,14 +2537,14 @@ and simplify_num_arithmetic_lexpr
   match le with
   | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> check_reduction 310; l
   (* Binary minus to unary minus *)
-  | BinOp (l, FMinus, r) -> f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
+  | BinOp (l, FMinus, r) -> check_reduction 311; f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
   (* Unary minus distributes over +, - *)
-  | UnOp (FUnaryMinus, e) -> (
+  | UnOp (FUnaryMinus, e) -> check_reduction 312; (
       match e with
-      | BinOp (l, FPlus, r) ->
+      | BinOp (l, FPlus, r) -> check_reduction 312_1;
           f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))
-      | BinOp (l, FMinus, r) -> f (BinOp (UnOp (FUnaryMinus, l), FPlus, r))
-      | _ -> le)
+      | BinOp (l, FMinus, r) -> check_reduction 312_2; f (BinOp (UnOp (FUnaryMinus, l), FPlus, r))
+      | _ -> check_reduction 312_3; le)
   (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, FPlus, r) ->
       check_reduction 313;
