@@ -84,7 +84,7 @@ def restore_reduction_file():
         print(f"Warning: File {reduction_file} not found when restoring original line.")
         return
     pattern = r"let \(\) = disable_reductions \[.*?\]"
-    new_content = re.sub(pattern, original_line, content, count=1)
+    new_content = re.sub(pattern, original_line, content, count=1, flags=re.DOTALL)
     if new_content != content:
         with open(reduction_file, "w") as f:
             f.write(new_content)
@@ -103,6 +103,9 @@ def test_reductions(simplifications, run_cmd):
     mandatory_timeout = []
 
     for simplification in simplifications:
+        if not re.fullmatch(r"\d[\d_]*", simplification):
+            print(f"  Skipping invalid simplification tag: {simplification!r}")
+            continue
         try:
             with open(reduction_file, "r") as f:
                 content = f.read()
@@ -192,7 +195,7 @@ def process_wisl_file(wisl_path: str) -> dict | None:
             "cat file.log", shell=True, check=True,
             capture_output=True, text=True
         )
-        matches = re.findall(r'\[REDUCE_([^\]]+)\]', result.stdout)
+        matches = re.findall(r'\[REDUCE_(\d[\d_]*)\]', result.stdout)
     except subprocess.CalledProcessError:
         print(f"  Error reading file.log for {wisl_path}; skipping.")
         return None

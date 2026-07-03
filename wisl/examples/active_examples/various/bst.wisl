@@ -16,7 +16,7 @@
 // machine-checked here.
 //
 
-predicate BST(+t) {
+predicate BST(t) {
   (t == null);
   (t -b> #v, #left, #right) * BST(#left) * BST(#right)
 }

@@ -1,4 +1,4 @@
-predicate is_float(+a: Float) {
+predicate is_float(a: Float) {
     emp
 }
 

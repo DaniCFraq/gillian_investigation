@@ -1,4 +1,4 @@
-predicate is_int(+a: Int) {
+predicate is_int(a: Int) {
     emp
 }
 
