@@ -9,23 +9,24 @@ Each tag is logged as `[REDUCE_<tag>]` when it fires and can be switched off wit
 
 **How to read the number.** The prefix tells you the family; underscores add depth (`105` → `105_13` → `105_13_3` is binary-op → integer `*` → `0 * _`). Notation in the table: `++` concat, `len(x)`, `x[i]` nth, `x[a..b]` sublist, `rev`, `car`/`cdr`, `∈`/`⊆`/`∖`/`∪`/`∩` sets, `<i`/`<=i` integer order, `<f`/`<=f` float order.
 
-_Total: 383 tag call-sites across 9 functions._
+_Total: 420 tag call-sites across 9 functions._
 
 ---
 
 ## `normalise_cat` — List-concat normaliser — final shape
-*Reduction.ml* · 3 tags
+*Reduction.ml* · 4 tags
 
 Picks the final form of a flattened `LstCat` after inner cats have been merged and literal runs joined.
 
 | Tag | Structure (trigger ⟶ result) | Meaning |
 |---|---|---|
+| `400` | `match nles with` | Final-shape dispatch for a flattened concat (parent of `400_*`). |
 | `400_1` | `[]` ⟶ `EList []` | Flattened concat is empty ⟶ `[]`. |
 | `400_2` | `[ x ]` ⟶ `x` | Concat of a single part ⟶ that part (drop the `LstCat`). |
 | `400_3` | `_` ⟶ `NOp (LstCat, nles)` | Concat of two or more parts ⟶ kept as `LstCat`. |
 
 ## `normalise_list_expressions` — List-structure normaliser
-*Reduction.ml* · 27 tags
+*Reduction.ml* · 34 tags
 
 Runs after every `reduce_lexpr_loop` step. Pushes list operations (`nth`, `car`, `cdr`, `len`) through known list structure and recurses structurally into every other node.
 
@@ -34,6 +35,7 @@ Runs after every `reduce_lexpr_loop` step. Pushes list operations (`nth`, `car`,
 | `401` | `Lit (LList lst)` ⟶ `Expr.from_lit_list (LList lst)` | Literal list `LList` ⟶ expanded to an `EList`. |
 | `402` | `Lit _ \| LVar _ \| ALoc _ \| PVar _` ⟶ `le` | Leaf (literal / lvar / aloc / pvar) ⟶ unchanged. |
 | `403` | `NOp (LstCat, les)` ⟶ `normalise_cat f les` | Concat ⟶ delegated to `normalise_cat`. |
+| `404` | `BinOp (le, LstNth, n)` | `l[n]` ⟶ list-indexing subtree dispatch (parent of `404_*`). |
 | `404_1` | `Some k` ⟶ `k` | `l[n]` on a concrete list, index in range ⟶ the element. |
 | `404_2` | `None` ⟶ `raise (exn "Invalid List Expression")` | `l[n]` on a concrete list, index out of range ⟶ error (invalid list expression). |
 | `404_3` | `Left k` ⟶ `k` | `(EList ++ tl)[n]` with n inside the literal head ⟶ that element. |
@@ -42,12 +44,15 @@ Runs after every `reduce_lexpr_loop` step. Pushes list operations (`nth`, `car`,
 | `404_6` | `_, Lit (Num _)` ⟶ `raise (exn "LstNth with float")` | List indexed by a float ⟶ error. |
 | `404_7` | `le, n` ⟶ `BinOp (le, LstNth, n)` | General `l[n]` ⟶ unchanged. |
 | `405` | `BinOp (le1, op, le2)` ⟶ `BinOp (f le1, op, f le2)` | Other binary op ⟶ recurse into both operands. |
+| `406` | `UnOp (Car, lst)` | `car` ⟶ head subtree dispatch (parent of `406_*`). |
 | `406_1` | `EList lst` ⟶ `List.hd lst` | `car` of a concrete list ⟶ its head. |
 | `406_2` | `NOp (LstCat, EList lst_l :: _)` ⟶ `List.hd lst_l` | `car (EList ++ ...)` ⟶ head of the literal prefix. |
 | `406_3` | `lst` ⟶ `UnOp (Car, lst)` | `car` of anything else ⟶ unchanged. |
+| `407` | `UnOp (Cdr, lst)` | `cdr` ⟶ tail subtree dispatch (parent of `407_*`). |
 | `407_1` | `EList lst` ⟶ `EList (List.tl lst)` | `cdr` of a concrete list ⟶ its tail. |
 | `407_2` | `NOp (LstCat, EList lst_l :: tl)` ⟶ `NOp (LstCat, EList (List.tl lst_l) :: tl)` | `cdr (EList ++ tl)` ⟶ `tail(EList) ++ tl`. |
 | `407_3` | `lst` ⟶ `UnOp (Cdr, lst)` | `cdr` of anything else ⟶ unchanged. |
+| `408` | `UnOp (LstLen, le)` | `len` ⟶ length subtree dispatch (parent of `408_*`). |
 | `408_1` | `EList lst` ⟶ `Expr.int (List.length lst)` | `len` of a concrete list ⟶ its literal length. |
 | `408_2` | `NOp (LstCat, EList lst :: tl)` | `len (EList ++ tl)` ⟶ `|EList| + len(tl)`. |
 | `408_3` | `le` ⟶ `UnOp (LstLen, le)` | `len` of anything else ⟶ unchanged. |
@@ -58,6 +63,9 @@ Runs after every `reduce_lexpr_loop` step. Pushes list operations (`nth`, `car`,
 | `413` | `LstSub (le1, le2, le3)` ⟶ `LstSub (f le1, f le2, f le3)` | `LstSub` ⟶ recurse into list, start and length. |
 | `414` | `Exists (bt, le)` ⟶ `Exists (bt, f le)` | `Exists` ⟶ recurse into the body. |
 | `415` | `ForAll (bt, le)` ⟶ `ForAll (bt, f le)` | `ForAll` ⟶ recurse into the body. |
+| `416` | `ConstructorApp (n, les)` ⟶ `ConstructorApp (n, List.map f les)` | Constructor application ⟶ recurse into each argument. |
+| `417` | `FuncApp (n, les)` ⟶ `FuncApp (n, List.map f les)` | Logical-function application ⟶ recurse into each argument. |
+| `418` | `Cases (le, cs)` | `Cases` ⟶ recurse into scrutinee and case bodies. |
 
 ## `prefix_catch` — Arithmetic canonicalisation (Cint / Cnum)
 *Reduction.ml* · 20 tags
@@ -88,9 +96,9 @@ Turns integer (200-series) and float (300-series) arithmetic into a polynomial n
 | `304` | `_` ⟶ `e` | Float expression with no arithmetic head ⟶ leaf (unchanged). |
 
 ## `reduce_lexpr_loop` — Main expression reducer
-*Reduction.ml* · 300 tags
+*Reduction.ml* · 327 tags
 
-The core rewriter, dispatched on the shape of the expression. Tags 001-104 are the top-level dispatch; the large sub-trees are `008_*` (quantifiers), `013_*` (`LstSub`), `022_*` (unary ops) and `105_*` (binary ops).
+The core rewriter, dispatched on the shape of the expression. Tags 001-124 are the top-level dispatch; the large sub-trees are `008_*` (quantifiers), `013_*` (`LstSub`), `022_*` (unary ops) and `105_*` (binary ops).
 
 | Tag | Structure (trigger ⟶ result) | Meaning |
 |---|---|---|
@@ -110,7 +118,6 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-104 are t
 | `010_1` | `_` ⟶ `true` | PFS proves the formula ⟶ `true`. |
 | `010_2` | `_` ⟶ `false ->` | PFS refutes the formula ⟶ `false`. |
 | `011` | `_` | `LstSub` dispatch (start/length analysis). |
-| `012` | `LstSub (e1, Lit (Int z), e3)` ⟶ `e1` | `l[0 .. len]` covering the whole list ⟶ `l`. |
 | `013` | `LstSub (le1, le2, le3)` | `LstSub (l, start, num)` — sublist subtree dispatch. |
 | `013_1` | `_, _, Lit (Int z) when Z.equal z Z.zero` ⟶ `EList []` | `l[_ .. 0]` (length 0) ⟶ `[]`. |
 | `013_2` | `flx, Lit (Int z), UnOp (LstLen, fle1)` ⟶ `fle1` | `l[start .. len(l)]`... ⟶ the underlying list. |
@@ -127,8 +134,6 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-104 are t
 | `013_13` | `NOp (LstCat, EList lel :: ler), Lit (Int n), fle3 when Z.gt n Z.zero` | `(EList ++ r)[n ..]` with n>0 ⟶ drop n from the literal head. |
 | `013_14` | `NOp (LstCat, lel :: ler), Lit (Int z), fle3` | `(l ++ r)[0 ..]` ⟶ slice within the head / spill into tail. |
 | `013_15` | `_` | `LstSub` fallthrough ⟶ unchanged. |
-| `014` | `UnOp (LstLen, LstSub (_, _, e))` | `len(l[_.._..n])` ⟶ `n` (length of a sublist of length n). |
-| `015` | `UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))` | `IntToNum(NumToInt le)` when `le` is known integer ⟶ `le`. |
 | `016` | `UnOp (ToNumberOp, UnOp (ToStringOp, le))` | `toNumber(toString le)` ⟶ simplified. |
 | `017` | `UnOp (LstRev, UnOp (LstRev, le))` | `rev(rev le)` ⟶ `le`. |
 | `018` | `UnOp (Not, BinOp (le1, FLessThan, le2))` | `¬(a <f b)` ⟶ `b <=f a`. |
@@ -137,9 +142,6 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-104 are t
 | `021` | `UnOp (Not, BinOp (le1, ILessThanEqual, le2))` | `¬(a <=i b)` ⟶ `b <i a`. |
 | `022` | `UnOp (op, le)` | `UnOp(op, le)` — unary-operator subtree dispatch. |
 | `022_1` | `_, Lit lit` | `op(literal)` ⟶ concretely evaluate. |
-| `022_1_1` | `CExprEval.TypeError err_msg` | Concrete eval type error ⟶ raise. |
-| `022_1_2` | `CExprEval.EvaluationError err_msg` | Concrete eval error ⟶ raise. |
-| `022_1_3` | `e` ⟶ `raise e` | Other eval exception ⟶ re-raise. |
 | `022_2` | `Not, UnOp (Not, ex)` ⟶ `ex` | `¬¬x` ⟶ `x`. |
 | `022_3` | `Not, BinOp (ex, And, ey)` ⟶ `BinOp (UnOp (Not, ex), Or, UnOp (Not, ey))` | `¬(x ∧ y)` ⟶ `¬x ∨ ¬y` (De Morgan). |
 | `022_4` | `Not, BinOp (ex, Or, ey)` ⟶ `BinOp (UnOp (Not, ex), And, UnOp (Not, ey))` | `¬(x ∨ y)` ⟶ `¬x ∧ ¬y` (De Morgan). |
@@ -172,6 +174,9 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-104 are t
 | `022_26_2` | `Some _, _` ⟶ `Expr.false_` | `isInt(IntToNum e)` with `e` non-int ⟶ `false`. |
 | `022_26_3` | `None, _` ⟶ `BinOp (UnOp (TypeOf, e), Equal, Lit (Type IntType))` | `isInt(IntToNum e)` type unknown ⟶ `typeOf(e) = Int`. |
 | `022_27` | `_, _` ⟶ `def` | Unary-op fallthrough ⟶ unchanged. |
+| `022_28` | `CExprEval.TypeError err_msg` | Concrete eval type error ⟶ raise (formerly `022_1_1`). |
+| `022_29` | `CExprEval.EvaluationError err_msg` | Concrete eval error ⟶ raise (formerly `022_1_2`). |
+| `022_30` | `e` ⟶ `raise e` | Other eval exception ⟶ re-raise (formerly `022_1_3`). |
 | `023` | `NOp (LstCat, LstSub (x1, Lit (Int z), z1) :: LstSub (x2, y2, z3) :: rest)` | `l1[0..z] ++ l2[..] ++ rest` ⟶ adjacent sublices merged. |
 | `024` | `NOp (LstCat, fst :: rest) when PFS.mem pfs (BinOp (fst, Equal, EList []))` | `(fst ++ rest)` with `fst = []` known ⟶ drop the empty head. |
 | `025` | `NOp (LstCat, [ x; LstSub (LVar y, UnOp (LstLen, x'), len) ])` | `x ++ y[len(x) .. len]` ⟶ simplified slice. |
@@ -223,7 +228,6 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-104 are t
 | `065` | `BinOp (BinOp (a, FTimes, b), FMod, c)` ⟶ `Expr.num 0.` | `(a * b) mod c` (float) ⟶ `0`. |
 | `066` | `BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z` ⟶ `y` | `x * (y / x)` ⟶ `y`. |
 | `067` | `BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z` ⟶ `x` | `(x / y) * y` ⟶ `x`. |
-| `068` | `BinOp (UnOp (NumToInt, x), Equal, y) \| BinOp (y, Equal, UnOp (NumToInt, x))` ⟶ `BinOp (UnOp (IntToNum, y), Equal, x)` | `NumToInt(x) = y` ⟶ `x = IntToNum(y)`. |
 | `069` | `BinOp (BinOp (Lit (String rs), StrCat, s), Equal, Lit (String ls))` | `(rs ++ s) = ls` (strings) ⟶ prefix-match rewrite. |
 | `069_1` | `-1` ⟶ `Expr.false_` | String compare returns -1 ⟶ `false`. |
 | `069_2` | `0 when ls <> rs` ⟶ `Expr.false_` | Prefixes differ (compare 0) ⟶ `false`. |
@@ -373,7 +377,7 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-104 are t
 | `105_20_5` | `false` ⟶ `(` | membership branch. |
 | `105_20_5_1` | `Lit _` | membership against literal element. |
 | `105_20_5_2` | `_` ⟶ `def` | membership fallthrough ⟶ default. |
-| `105_20_4` | `_, _` ⟶ `def` | membership decided ⟶ `true`. |
+| `105_20_6` | `_, _` ⟶ `def` | Membership fallthrough ⟶ default (formerly a duplicated `105_20_4`). |
 | `105_21` | `SetSub when lexpr_is_bool gamma def` | `SetSub` (⊆) ⟶ subset subtree. |
 | `105_21_1` | `ESet [], _` ⟶ `Lit (Bool true)` | `∅ ⊆ _` ⟶ `true`. |
 | `105_21_2` | `_, ESet []` ⟶ `Lit (Bool false)` | `_ ⊆ ∅` ⟶ `false`. |
@@ -394,6 +398,37 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-104 are t
 | `105_25_1` | `Some x` ⟶ `Lit (Bool x)` | `<=i` decided by sign check ⟶ that boolean. |
 | `105_25_2` | `None` ⟶ `def` | `<=i` undecided ⟶ default. |
 | `105_26` | `_` ⟶ `def` | Binary-op fallthrough ⟶ default. |
+| `106` | `ConstructorApp (n, les)` ⟶ `ConstructorApp (n, List.map f les)` | Constructor application ⟶ reduce each argument. |
+| `107` | `FuncApp (n, les)` ⟶ `FuncApp (n, List.map f les)` | Logical-function application ⟶ reduce each argument. |
+| `108` | `Cases (ConstructorApp (c, les), cs)` | `Cases` on a known constructor ⟶ select the matching case. |
+| `108_1` | `[ (bs, e) ] when \|bs\| = \|les\|` | Unique matching case ⟶ substitute the bindings into its body and reduce. |
+| `108_2` | `_` ⟶ `raise (ReductionException (le, "No case match found"))` | No (unique) matching case ⟶ error. |
+| `109` | `Cases (le, cs)` | `Cases` on anything else ⟶ reduce scrutinee and case bodies. |
+| `110` | `BinOp (ConstructorApp (ln, lles), Equal, ConstructorApp (rn, rles))` | `C(l…) = C'(r…)` ⟶ constructor equality. |
+| `110_1` | `ln = rn && \|lles\| = \|rles\|` | Same constructor and arity ⟶ conjunction of pointwise argument equalities. |
+| `110_2` | `_` ⟶ `Expr.false_` | Different constructor or arity ⟶ `false`. |
+| `111` | `BinOp (ConstructorApp _, Equal, rle)` | `C(…) = e` ⟶ dispatch on the shape of `e`. |
+| `111_1` | `LVar _ \| ConstructorApp _ \| FuncApp _ \| Cases _` ⟶ `le` | Rhs is opaque ⟶ unchanged. |
+| `111_2` | `_` ⟶ `Expr.false_` | Rhs can never be a constructor value ⟶ `false`. |
+| `112` | `LstSub (e1, Lit (Int 0), e3) when len-equality known` ⟶ `e1` | `l[0..n]` with `len(l) = n` in the PFS ⟶ `l` (formerly `012_1`). |
+| `113` | `LstSub (e1, e2, e3)` | `l[a..b]` ⟶ swap `l` for a PFS-equal expression sharing variables with `b` (formerly `012_2`). |
+| `114` | `UnOp (NumToInt, UnOp (IntToNum, e)) \| … \| UnOp (LstLen, LstSub (_, _, e))` ⟶ `e` | Cancelling group: `NumToInt(IntToNum e)`, `-(-e)`, `len(repeat(_, e))`, `len(l[_..e])` ⟶ `e` (formerly `014_1`). |
+| `115` | `UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))` ⟶ `le` | `IntToNum(NumToInt le)` when `le` is known integer ⟶ `le` (formerly `014_2`). |
+| `116` | `UnOp (IntToNum, BinOp (le1, IPlus, le2))` | `IntToNum(a +i b)` ⟶ `IntToNum(a) +f IntToNum(b)` (formerly `014_3`). |
+| `117` | `UnOp (NumToInt, BinOp (le1, FPlus, le2))` | `NumToInt(a +f b)` ⟶ `NumToInt(a) +i NumToInt(b)` (formerly `014_4`). |
+| `118` | `UnOp (NumToInt, BinOp (le1, FTimes, le2))` | `NumToInt(a *f b)` ⟶ `NumToInt(a) *i NumToInt(b)` (formerly `014_5`). |
+| `119` | `UnOp (IntToNum, UnOp (LstLen, x))` | `IntToNum(len x)` with a unique `NumToInt` equality in the PFS ⟶ substitute it. |
+| `119_1` | `UnOp (NumToInt, e)` ⟶ `e` | The unique equality is `NumToInt(e)` ⟶ `e` (formerly `014_6`). |
+| `119_2` | `_` ⟶ `raise (ReductionException (le, "Impossible"))` | Impossible shape ⟶ error (formerly `014_7`). |
+| `120` | `UnOp (IsInt, UnOp (IntToNum, _))` ⟶ `Lit (Bool true)` | `IsInt(IntToNum _)` ⟶ `true` (formerly `014_8`). |
+| `121` | `UnOp (IsInt, Lit (Num n))` ⟶ `Lit (Bool (Float.is_integer n))` | `IsInt(n)` on a float literal ⟶ its integer-ness (formerly `014_9`). |
+| `122` | `UnOp (IsInt, BinOp (le', (FPlus \| FMinus \| FTimes), re'))` | `IsInt(a ⊕f b)` ⟶ split into `IsInt` of the operands (formerly `014_10`). |
+| `123` | `BinOp (UnOp (NumToInt, x), Equal, y)` | `NumToInt(x) = y` ⟶ guard dispatch on `y`. |
+| `123_1` | `UnOp (LstLen, _)` ⟶ guard `false` | `y = len(_)` ⟶ rewrite refused (formerly `068_11`). |
+| `123_2` | `_` ⟶ guard `true` | Otherwise ⟶ `x = IntToNum(y)` (formerly `068_12`). |
+| `124` | `BinOp (y, Equal, UnOp (NumToInt, x))` | `y = NumToInt(x)` ⟶ guard dispatch on `y` (mirror of `123`). |
+| `124_1` | `UnOp (LstLen, _)` ⟶ guard `false` | `y = len(_)` ⟶ rewrite refused (formerly `068_21`). |
+| `124_2` | `_` ⟶ guard `true` | Otherwise ⟶ `x = IntToNum(y)` (formerly `068_22`). |
 
 ## `simplify_int_arithmetic_lexpr` — Integer arithmetic helper
 *Reduction.ml* · 6 tags
@@ -410,7 +445,7 @@ Light integer simplifications (identities, minus→plus) applied around the `Cin
 | `215` | `_` ⟶ `le` | Integer-arith fallthrough ⟶ unchanged. |
 
 ## `simplify_num_arithmetic_lexpr` — Float arithmetic helper
-*Reduction.ml* · 6 tags
+*Reduction.ml* · 8 tags
 
 Light float simplifications (identities, minus→plus) applied around the `Cnum` canonical form.
 
@@ -418,8 +453,10 @@ Light float simplifications (identities, minus→plus) applied around the `Cnum`
 |---|---|---|
 | `310` | `BinOp (l, FPlus, Lit (Num 0.)) \| BinOp (Lit (Num 0.), FPlus, l)` ⟶ `l` | `l +. 0.` / `0. +. l` ⟶ `l`. |
 | `311` | `BinOp (l, FMinus, r)` ⟶ `f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))` | `l -. r` ⟶ `l +. (-.r)`. |
-| `312` | `BinOp (l, FPlus, r)` ⟶ `f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))` | `-.(l +. r)` ⟶ `(-.l) +. (-.r)`. |
-| `312_1` | `_` ⟶ `le` | `-.l` not distributable ⟶ unchanged. |
+| `312` | `UnOp (FUnaryMinus, e)` | Float unary minus `-.e` — dispatch (parent of `312_*`). |
+| `312_1` | `BinOp (l, FPlus, r)` ⟶ `f ((-.l) +. (-.r))` | `-.(l +. r)` ⟶ `(-.l) +. (-.r)`. |
+| `312_2` | `BinOp (l, FMinus, r)` ⟶ `f ((-.l) +. r)` | `-.(l -. r)` ⟶ `(-.l) +. r`. |
+| `312_3` | `_` ⟶ `le` | `-.e` not distributable ⟶ unchanged. |
 | `313` | `BinOp (l, FPlus, r)` | `l +. r` ⟶ combine via the `Cnum` canonical form. |
 | `314` | `_` ⟶ `le` | Float-arith fallthrough ⟶ unchanged. |
 

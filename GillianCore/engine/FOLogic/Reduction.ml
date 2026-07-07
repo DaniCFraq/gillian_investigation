@@ -157,6 +157,7 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
       nles
   in
   let result : Expr.t =
+    check_reduction 400;
     match nles with
     | [] -> check_reduction 400_1; EList []
     | [ x ] -> check_reduction 400_2; x
@@ -184,6 +185,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     (* Binary Operators **)
     | NOp (LstCat, les) -> check_reduction 403; normalise_cat f les
     | BinOp (le, LstNth, n) -> (
+        check_reduction 404;
         match (f le, f n) with
         | EList lst, Lit (Int n) -> (
             match List.nth_opt lst (Z.to_int n) with
@@ -204,6 +206,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | BinOp (le1, op, le2) -> check_reduction 405; BinOp (f le1, op, f le2)
     (* Unary Operators **)
     | UnOp (Car, lst) -> (
+        check_reduction 406;
         match f lst with
         | EList lst -> (
             try check_reduction 406_1; List.hd lst
@@ -219,6 +222,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
             )
         | lst -> check_reduction 406_3; UnOp (Car, lst))
     | UnOp (Cdr, lst) -> (
+        check_reduction 407;
         match f lst with
         | EList lst -> (
             try check_reduction 407_1; EList (List.tl lst)
@@ -234,6 +238,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
             )
         | lst -> check_reduction 407_3; UnOp (Cdr, lst))
     | UnOp (LstLen, le) -> (
+        check_reduction 408;
         match f le with
         | EList lst -> check_reduction 408_1; Expr.int (List.length lst)
         | NOp (LstCat, EList lst :: tl) ->
@@ -246,14 +251,14 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | UnOp (op, le) -> check_reduction 409; UnOp (op, f le)
     | NOp (op, les) -> check_reduction 410; NOp (op, List.map f les)
     (* Uninteresting cases **)
-    | EList lst -> EList (List.map f lst)
-    | ESet lst -> ESet (List.map f lst)
-    | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
-    | Exists (bt, le) -> Exists (bt, f le)
-    | ForAll (bt, le) -> ForAll (bt, f le)
-    | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
-    | FuncApp (n, les) -> FuncApp (n, List.map f les)
-    | Cases (le, cs) ->
+    | EList lst -> check_reduction 411; EList (List.map f lst)
+    | ESet lst -> check_reduction 412; ESet (List.map f lst)
+    | LstSub (le1, le2, le3) -> check_reduction 413; LstSub (f le1, f le2, f le3)
+    | Exists (bt, le) -> check_reduction 414; Exists (bt, f le)
+    | ForAll (bt, le) -> check_reduction 415; ForAll (bt, f le)
+    | ConstructorApp (n, les) -> check_reduction 416; ConstructorApp (n, List.map f les)
+    | FuncApp (n, les) -> check_reduction 417; FuncApp (n, List.map f les)
+    | Cases (le, cs) -> check_reduction 418;
         Cases (f le, List.map (fun (c, bs, le) -> (c, bs, f le)) cs)
     (*
     | LstSub(le1, le2, le3) ->
@@ -1048,26 +1053,28 @@ and reduce_lexpr_loop
     (* -------------------------
                  ESet
        ------------------------- *)
-    | ESet les -> ESet (Expr.Set.elements @@ Expr.Set.of_list @@ List.map f les)
+    | ESet les -> check_reduction 005;
+        ESet (Expr.Set.elements @@ Expr.Set.of_list @@ List.map f les)
     (* -------------------------
              Constructors
        ------------------------- *)
-    | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
+    | ConstructorApp (n, les) -> check_reduction 106; ConstructorApp (n, List.map f les)
     (* -------------------------
          Function Application
        ------------------------- *)
-    | FuncApp (n, les) -> FuncApp (n, List.map f les)
+    | FuncApp (n, les) -> check_reduction 107; FuncApp (n, List.map f les)
     (* -------------------------
                  Cases
        ------------------------- *)
     | Cases (ConstructorApp (c, les), cs) -> (
+        check_reduction 108;
         let bles =
           List.filter_map
             (fun (c', bs, e) -> if c = c' then Some (bs, e) else None)
             cs
         in
         match bles with
-        | [ (bs, e) ] when List.length bs = List.length les ->
+        | [ (bs, e) ] when List.length bs = List.length les -> check_reduction 108_1;
             let le =
               List.fold_left2
                 (fun acc b le ->
@@ -1076,8 +1083,8 @@ and reduce_lexpr_loop
                 e bs les
             in
             f le
-        | _ -> raise (ReductionException (le, "No case match found")))
-    | Cases (le, cs) ->
+        | _ -> check_reduction 108_2; raise (ReductionException (le, "No case match found")))
+    | Cases (le, cs) -> check_reduction 109;
         let le' = f le in
         let f' = if not (Expr.equal le le') then f else Fun.id in
         let cs' = List.map (fun (c, bs, e) -> (c, bs, f e)) cs in
@@ -1240,7 +1247,7 @@ and reduce_lexpr_loop
         |> Option.get
     | LstSub (e1, Lit (Int z), e3)
       when Z.equal z Z.zero
-           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> check_reduction 012_1; e1
+           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> check_reduction 112; e1
     | LstSub (e1, e2, e3)
       when SS.inter (Expr.lvars e1) (Expr.lvars e3) = SS.empty
            && List.length
@@ -1248,7 +1255,7 @@ and reduce_lexpr_loop
                    (fun e ->
                      SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty)
                    (get_equal_expressions pfs e1))
-              > 0 -> check_reduction 012_2;
+              > 0 -> check_reduction 113;
         let eqs = get_equal_expressions pfs e1 in
         let e1' =
           List.hd
@@ -1529,15 +1536,15 @@ and reduce_lexpr_loop
     | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e))
     | UnOp (IUnaryMinus, UnOp (IUnaryMinus, e))
     | UnOp (LstLen, BinOp (_, LstRepeat, e))
-    | UnOp (LstLen, LstSub (_, _, e)) -> check_reduction 014_1; e
+    | UnOp (LstLen, LstSub (_, _, e)) -> check_reduction 114; e
     | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))
-      -> check_reduction 014_2; le
+      -> check_reduction 115; le
     (* Conversions *)
-    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) -> check_reduction 014_3;
+    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) -> check_reduction 116;
         BinOp (UnOp (IntToNum, le1), FPlus, UnOp (IntToNum, le2))
-    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) -> check_reduction 014_4;
+    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) -> check_reduction 117;
         BinOp (UnOp (NumToInt, le1), IPlus, UnOp (NumToInt, le2))
-    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) -> check_reduction 014_5;
+    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) -> check_reduction 118;
         BinOp (UnOp (NumToInt, le1), ITimes, UnOp (NumToInt, le2))
     | UnOp (IntToNum, UnOp (LstLen, x))
       when List.length
@@ -1547,6 +1554,7 @@ and reduce_lexpr_loop
                     | Expr.UnOp (NumToInt, _) -> true
                     | _ -> false))
            = 1 -> (
+        check_reduction 119;
         L.verbose (fun fmt -> fmt "l-len conversion: %a" Expr.pp le);
         let eqs =
           get_equal_expressions pfs (UnOp (LstLen, x))
@@ -1556,14 +1564,14 @@ and reduce_lexpr_loop
                  | _ -> false)
         in
         match List.hd eqs with
-        | UnOp (NumToInt, e) -> check_reduction 014_6; e
-        | _ -> check_reduction 014_7; raise (ReductionException (le, "Impossible")))
+        | UnOp (NumToInt, e) -> check_reduction 119_1; e
+        | _ -> check_reduction 119_2; raise (ReductionException (le, "Impossible")))
     (* IsInt *)
-    | UnOp (IsInt, UnOp (IntToNum, _)) -> check_reduction 014_8; Lit (Bool true)
-    | UnOp (IsInt, Lit (Num n)) -> check_reduction 014_9; Lit (Bool (Float.is_integer n))
+    | UnOp (IsInt, UnOp (IntToNum, _)) -> check_reduction 120; Lit (Bool true)
+    | UnOp (IsInt, Lit (Num n)) -> check_reduction 121; Lit (Bool (Float.is_integer n))
     | UnOp (IsInt, BinOp (le', FPlus, re'))
     | UnOp (IsInt, BinOp (le', FMinus, re'))
-    | UnOp (IsInt, BinOp (le', FTimes, re')) -> check_reduction 014_10;
+    | UnOp (IsInt, BinOp (le', FTimes, re')) -> check_reduction 122;
         let resl = f (UnOp (IsInt, le')) in
         L.verbose (fun fmt ->
             fmt "is_int_reduction: %a\n\tlhs: %a" Expr.pp le Expr.pp resl);
@@ -1610,11 +1618,11 @@ and reduce_lexpr_loop
             L.normal (fun m -> m "[DEBUG] What is le = %a" Expr.pp fle);
             check_reduction 022_1;
             try Lit (CExprEval.evaluate_unop op lit) with
-            | CExprEval.TypeError err_msg -> check_reduction 022_1_1;
+            | CExprEval.TypeError err_msg -> check_reduction 022_28;
                 raise (ReductionException (def, err_msg))
-            | CExprEval.EvaluationError err_msg -> check_reduction 022_1_2;
+            | CExprEval.EvaluationError err_msg -> check_reduction 022_29;
                 raise (ReductionException (def, err_msg))
-            | e -> check_reduction 022_1_3; raise e)
+            | e -> check_reduction 022_30; raise e)
         | Not, UnOp (Not, ex) -> check_reduction 022_2; ex
         | Not, BinOp (ex, And, ey) -> check_reduction 022_3; BinOp (UnOp (Not, ex), Or, UnOp (Not, ey))
         | Not, BinOp (ex, Or, ey) -> check_reduction 022_4; BinOp (UnOp (Not, ex), And, UnOp (Not, ey))
@@ -1998,13 +2006,15 @@ and reduce_lexpr_loop
     | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> check_reduction 066; y
     | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> check_reduction 067; x
     | BinOp (UnOp (NumToInt, x), Equal, y)
-      when match y with
-           | UnOp (LstLen, _) -> check_reduction 068_11; false
-           | _ -> check_reduction 068_12; true -> BinOp (UnOp (IntToNum, y), Equal, x)
+      when (check_reduction 123;
+            match y with
+            | UnOp (LstLen, _) -> check_reduction 123_1; false
+            | _ -> check_reduction 123_2; true) -> BinOp (UnOp (IntToNum, y), Equal, x)
     | BinOp (y, Equal, UnOp (NumToInt, x))
-      when match y with
-           | UnOp (LstLen, _) -> check_reduction 068_21; false
-           | _ -> check_reduction 068_22; true -> BinOp (UnOp (IntToNum, y), Equal, x)
+      when (check_reduction 124;
+            match y with
+            | UnOp (LstLen, _) -> check_reduction 124_1; false
+            | _ -> check_reduction 124_2; true) -> BinOp (UnOp (IntToNum, y), Equal, x)
     (* BinOps: Equalities (strings) *)
     (* x = y ++ z
           /\ |x| < |y| => false
@@ -2082,17 +2092,20 @@ and reduce_lexpr_loop
     | BinOp (UnOp (TypeOf, BinOp (_, StrCat, _)), Equal, Lit (Type t))
       when t <> StringType -> check_reduction 083; Expr.false_
     | BinOp (UnOp (TypeOf, BinOp (_, SetMem, _)), Equal, Lit (Type t))
-      when t <> BooleanType -> Expr.false_
+      when t <> BooleanType -> check_reduction 084; Expr.false_
     (* BinOps: Equalities (Constructors) *)
     | BinOp (ConstructorApp (ln, lles), Equal, ConstructorApp (rn, rles)) ->
-        if ln = rn && List.length lles = List.length rles then
+        check_reduction 110;
+        if ln = rn && List.length lles = List.length rles then (
+          check_reduction 110_1;
           Expr.conjunct
-            (List.map2 (fun le re -> Expr.BinOp (le, Equal, re)) lles rles)
-        else Expr.false_
+            (List.map2 (fun le re -> Expr.BinOp (le, Equal, re)) lles rles))
+        else (check_reduction 110_2; Expr.false_)
     | BinOp (ConstructorApp _, Equal, rle) as le -> (
+        check_reduction 111;
         match rle with
-        | LVar _ | ConstructorApp _ | FuncApp _ | Cases _ -> le
-        | _ -> Expr.false_)
+        | LVar _ | ConstructorApp _ | FuncApp _ | Cases _ -> check_reduction 111_1; le
+        | _ -> check_reduction 111_2; Expr.false_)
     (* BinOps: Logic *)
     | BinOp (Lit (Bool true), And, e)
     | BinOp (e, And, Lit (Bool true))
@@ -2491,7 +2504,7 @@ and reduce_lexpr_loop
                           (Lit (Bool false))
                         else (def)
                     | _ -> check_reduction 105_20_5_2; def))
-            | _, _ -> check_reduction 105_20_4; def)
+            | _, _ -> check_reduction 105_20_6; def)
         | SetSub when lexpr_is_bool gamma def -> (
             check_reduction 105_21;
             match (flel, fler) with
