@@ -174,9 +174,9 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-124 are t
 | `022_26_2` | `Some _, _` ⟶ `Expr.false_` | `isInt(IntToNum e)` with `e` non-int ⟶ `false`. |
 | `022_26_3` | `None, _` ⟶ `BinOp (UnOp (TypeOf, e), Equal, Lit (Type IntType))` | `isInt(IntToNum e)` type unknown ⟶ `typeOf(e) = Int`. |
 | `022_27` | `_, _` ⟶ `def` | Unary-op fallthrough ⟶ unchanged. |
-| `022_28` | `CExprEval.TypeError err_msg` | Concrete eval type error ⟶ raise (formerly `022_1_1`). |
-| `022_29` | `CExprEval.EvaluationError err_msg` | Concrete eval error ⟶ raise (formerly `022_1_2`). |
-| `022_30` | `e` ⟶ `raise e` | Other eval exception ⟶ re-raise (formerly `022_1_3`). |
+| `022_28` | `CExprEval.TypeError err_msg` | Concrete eval type error ⟶ raise. |
+| `022_29` | `CExprEval.EvaluationError err_msg` | Concrete eval error ⟶ raise. |
+| `022_30` | `e` ⟶ `raise e` | Other eval exception ⟶ re-raise. |
 | `023` | `NOp (LstCat, LstSub (x1, Lit (Int z), z1) :: LstSub (x2, y2, z3) :: rest)` | `l1[0..z] ++ l2[..] ++ rest` ⟶ adjacent sublices merged. |
 | `024` | `NOp (LstCat, fst :: rest) when PFS.mem pfs (BinOp (fst, Equal, EList []))` | `(fst ++ rest)` with `fst = []` known ⟶ drop the empty head. |
 | `025` | `NOp (LstCat, [ x; LstSub (LVar y, UnOp (LstLen, x'), len) ])` | `x ++ y[len(x) .. len]` ⟶ simplified slice. |
@@ -377,7 +377,7 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-124 are t
 | `105_20_5` | `false` ⟶ `(` | membership branch. |
 | `105_20_5_1` | `Lit _` | membership against literal element. |
 | `105_20_5_2` | `_` ⟶ `def` | membership fallthrough ⟶ default. |
-| `105_20_6` | `_, _` ⟶ `def` | Membership fallthrough ⟶ default (formerly a duplicated `105_20_4`). |
+| `105_20_6` | `_, _` ⟶ `def` | Membership fallthrough ⟶ default. |
 | `105_21` | `SetSub when lexpr_is_bool gamma def` | `SetSub` (⊆) ⟶ subset subtree. |
 | `105_21_1` | `ESet [], _` ⟶ `Lit (Bool true)` | `∅ ⊆ _` ⟶ `true`. |
 | `105_21_2` | `_, ESet []` ⟶ `Lit (Bool false)` | `_ ⊆ ∅` ⟶ `false`. |
@@ -410,25 +410,25 @@ The core rewriter, dispatched on the shape of the expression. Tags 001-124 are t
 | `111` | `BinOp (ConstructorApp _, Equal, rle)` | `C(…) = e` ⟶ dispatch on the shape of `e`. |
 | `111_1` | `LVar _ \| ConstructorApp _ \| FuncApp _ \| Cases _` ⟶ `le` | Rhs is opaque ⟶ unchanged. |
 | `111_2` | `_` ⟶ `Expr.false_` | Rhs can never be a constructor value ⟶ `false`. |
-| `112` | `LstSub (e1, Lit (Int 0), e3) when len-equality known` ⟶ `e1` | `l[0..n]` with `len(l) = n` in the PFS ⟶ `l` (formerly `012_1`). |
-| `113` | `LstSub (e1, e2, e3)` | `l[a..b]` ⟶ swap `l` for a PFS-equal expression sharing variables with `b` (formerly `012_2`). |
-| `114` | `UnOp (NumToInt, UnOp (IntToNum, e)) \| … \| UnOp (LstLen, LstSub (_, _, e))` ⟶ `e` | Cancelling group: `NumToInt(IntToNum e)`, `-(-e)`, `len(repeat(_, e))`, `len(l[_..e])` ⟶ `e` (formerly `014_1`). |
-| `115` | `UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))` ⟶ `le` | `IntToNum(NumToInt le)` when `le` is known integer ⟶ `le` (formerly `014_2`). |
-| `116` | `UnOp (IntToNum, BinOp (le1, IPlus, le2))` | `IntToNum(a +i b)` ⟶ `IntToNum(a) +f IntToNum(b)` (formerly `014_3`). |
-| `117` | `UnOp (NumToInt, BinOp (le1, FPlus, le2))` | `NumToInt(a +f b)` ⟶ `NumToInt(a) +i NumToInt(b)` (formerly `014_4`). |
-| `118` | `UnOp (NumToInt, BinOp (le1, FTimes, le2))` | `NumToInt(a *f b)` ⟶ `NumToInt(a) *i NumToInt(b)` (formerly `014_5`). |
+| `112` | `LstSub (e1, Lit (Int 0), e3) when len-equality known` ⟶ `e1` | `l[0..n]` with `len(l) = n` in the PFS ⟶ `l`. |
+| `113` | `LstSub (e1, e2, e3)` | `l[a..b]` ⟶ swap `l` for a PFS-equal expression sharing variables with `b`. |
+| `114` | `UnOp (NumToInt, UnOp (IntToNum, e)) \| … \| UnOp (LstLen, LstSub (_, _, e))` ⟶ `e` | Cancelling group: `NumToInt(IntToNum e)`, `-(-e)`, `len(repeat(_, e))`, `len(l[_..e])` ⟶ `e`. |
+| `115` | `UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))` ⟶ `le` | `IntToNum(NumToInt le)` when `le` is known integer ⟶ `le`. |
+| `116` | `UnOp (IntToNum, BinOp (le1, IPlus, le2))` | `IntToNum(a +i b)` ⟶ `IntToNum(a) +f IntToNum(b)`. |
+| `117` | `UnOp (NumToInt, BinOp (le1, FPlus, le2))` | `NumToInt(a +f b)` ⟶ `NumToInt(a) +i NumToInt(b)`. |
+| `118` | `UnOp (NumToInt, BinOp (le1, FTimes, le2))` | `NumToInt(a *f b)` ⟶ `NumToInt(a) *i NumToInt(b)`. |
 | `119` | `UnOp (IntToNum, UnOp (LstLen, x))` | `IntToNum(len x)` with a unique `NumToInt` equality in the PFS ⟶ substitute it. |
-| `119_1` | `UnOp (NumToInt, e)` ⟶ `e` | The unique equality is `NumToInt(e)` ⟶ `e` (formerly `014_6`). |
-| `119_2` | `_` ⟶ `raise (ReductionException (le, "Impossible"))` | Impossible shape ⟶ error (formerly `014_7`). |
-| `120` | `UnOp (IsInt, UnOp (IntToNum, _))` ⟶ `Lit (Bool true)` | `IsInt(IntToNum _)` ⟶ `true` (formerly `014_8`). |
-| `121` | `UnOp (IsInt, Lit (Num n))` ⟶ `Lit (Bool (Float.is_integer n))` | `IsInt(n)` on a float literal ⟶ its integer-ness (formerly `014_9`). |
-| `122` | `UnOp (IsInt, BinOp (le', (FPlus \| FMinus \| FTimes), re'))` | `IsInt(a ⊕f b)` ⟶ split into `IsInt` of the operands (formerly `014_10`). |
+| `119_1` | `UnOp (NumToInt, e)` ⟶ `e` | The unique equality is `NumToInt(e)` ⟶ `e`. |
+| `119_2` | `_` ⟶ `raise (ReductionException (le, "Impossible"))` | Impossible shape ⟶ error. |
+| `120` | `UnOp (IsInt, UnOp (IntToNum, _))` ⟶ `Lit (Bool true)` | `IsInt(IntToNum _)` ⟶ `true`. |
+| `121` | `UnOp (IsInt, Lit (Num n))` ⟶ `Lit (Bool (Float.is_integer n))` | `IsInt(n)` on a float literal ⟶ its integer-ness. |
+| `122` | `UnOp (IsInt, BinOp (le', (FPlus \| FMinus \| FTimes), re'))` | `IsInt(a ⊕f b)` ⟶ split into `IsInt` of the operands. |
 | `123` | `BinOp (UnOp (NumToInt, x), Equal, y)` | `NumToInt(x) = y` ⟶ guard dispatch on `y`. |
-| `123_1` | `UnOp (LstLen, _)` ⟶ guard `false` | `y = len(_)` ⟶ rewrite refused (formerly `068_11`). |
-| `123_2` | `_` ⟶ guard `true` | Otherwise ⟶ `x = IntToNum(y)` (formerly `068_12`). |
+| `123_1` | `UnOp (LstLen, _)` ⟶ guard `false` | `y = len(_)` ⟶ rewrite refused. |
+| `123_2` | `_` ⟶ guard `true` | Otherwise ⟶ `x = IntToNum(y)`. |
 | `124` | `BinOp (y, Equal, UnOp (NumToInt, x))` | `y = NumToInt(x)` ⟶ guard dispatch on `y` (mirror of `123`). |
-| `124_1` | `UnOp (LstLen, _)` ⟶ guard `false` | `y = len(_)` ⟶ rewrite refused (formerly `068_21`). |
-| `124_2` | `_` ⟶ guard `true` | Otherwise ⟶ `x = IntToNum(y)` (formerly `068_22`). |
+| `124_1` | `UnOp (LstLen, _)` ⟶ guard `false` | `y = len(_)` ⟶ rewrite refused. |
+| `124_2` | `_` ⟶ guard `true` | Otherwise ⟶ `x = IntToNum(y)`. |
 
 ## `simplify_int_arithmetic_lexpr` — Integer arithmetic helper
 *Reduction.ml* · 6 tags
