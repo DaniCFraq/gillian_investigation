@@ -1,0 +1,18 @@
+module NumToIntReductions
+  use int.Int
+  use real.RealInfix
+  use real.Truncate
+  use real.FromInt
+
+  (* tag 117 - must not proven correctly *)
+  goal fplus_distrib_unsound:
+    forall a b : real. floor (a +. b) = floor a + floor b
+
+  (* tag 118 - must not proven correctly *)
+  goal ftimes_distrib_unsound:
+    forall a b : real. floor (a *. b) = floor a * floor b
+
+  (* possible fix? TODO*)
+  lemma fplus_guarded_sound:
+    forall n : int, b : real. floor (from_int n +. b) = n + floor b
+end
