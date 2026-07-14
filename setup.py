@@ -10,7 +10,7 @@ from pathlib import Path
 """
     1º - Vai correr o programa e ler do ficheiro file.log todas as entradas que comecam por "[REDUCE_" e assim conseguir os numeros das simplificações que estão a ser usadas naquele programa, sem duplicados.
     2º - Ao processar as simplififcações, deixamos apenas aquelas que estão a ser realmente usadas, sem desativar a simplificação pai (do topo).
-    3º - Verificar quais simplificações podem ser desativadas. Para isso, vamos correr o programa com uma simplificação desativada de cada vez. Se essa simplificação der erro, continuamos, se não der erro, adicionamos ao array de simplificações que podem ser desativadas.
+    3º - Verificar quais simplificações podem ser desativadas. Para isso, corremos primeiro o programa sem alterações e guardamos o resultado (baseline): veredicto de cada spec, falhas reportadas e se o motor crashou. Depois corremos o programa com uma simplificação desativada de cada vez: se o resultado for igual ao baseline, a simplificação é opcional; se mudar (erro diferente, crash, timeout, ou uma falha que desaparece), é obrigatória. Isto permite analisar também exemplos que falham de propósito (memory errors), cujo baseline já é uma falha.
     4º - Para cada ficheiro .wisl encontrado recursivamente na pasta indicada, guarda o caminho, as simplificações obrigatórias e as opcionais num ficheiro CSV.
     5º - Se o ficheiro .wisl já existir no CSV, é ignorado (skip).
 """
@@ -92,11 +92,33 @@ def restore_reduction_file():
     Path("file.log").write_text("")
 
 
-def test_reductions(simplifications, run_cmd):
+def outcome_signature(trace: str) -> tuple:
     """
-    Test each simplification by disabling it one at a time.
-    Returns three lists: optional simplifications, mandatory simplifications due
-    to error, and mandatory simplifications due to timeout.
+    Extract a stable outcome signature from a verify run's output:
+    the verdict of each spec/lemma, the set of reported analysis
+    failures, and whether the engine crashed. Timing values and
+    branch progress marks ("s s f") are ignored, so two runs with
+    the same final result compare equal even for examples whose
+    expected result is a failure (e.g. memory error examples).
+    """
+    verdicts = sorted(
+        (m.group(1), m.group(2))
+        for m in re.finditer(
+            r"^(Verifying .*?)\.\.\..*?(Success|Failure)\s*$", trace, re.MULTILINE
+        )
+    )
+    failures = sorted(set(re.findall(r"^\s*\d+\.\s+(.*?)\s*$", trace, re.MULTILINE)))
+    crashed = bool(re.search(r"Fatal error|[Bb]acktrace|exception", trace))
+    return (tuple(verdicts), tuple(failures), crashed)
+
+
+def test_reductions(simplifications, run_cmd, baseline_sig):
+    """
+    Test each simplification by disabling it one at a time and comparing
+    the run's outcome against the baseline (unmodified) run.
+    Returns three lists: optional simplifications (same outcome as
+    baseline), mandatory simplifications whose outcome changed, and
+    mandatory simplifications due to timeout.
     """
     can_disable = []
     mandatory_error = []
@@ -121,14 +143,10 @@ def test_reductions(simplifications, run_cmd):
         skip = False
         try:
             clear_output_file()
-            run_command(run_cmd, timeout=RUN_TIMEOUT, check=True)
+            run_command(run_cmd, timeout=RUN_TIMEOUT)
         except subprocess.TimeoutExpired:
             print(f"  Timeout ({RUN_TIMEOUT}s) for simplification {simplification}; skipping.")
             mandatory_timeout.append(simplification)
-            skip = True
-        except subprocess.CalledProcessError:
-            print(f"  Run error for simplification {simplification}; skipping.")
-            mandatory_error.append(simplification)
             skip = True
         except Exception as e:
             print(f"  Unexpected error testing simplification {simplification}: {e}")
@@ -139,9 +157,10 @@ def test_reductions(simplifications, run_cmd):
             try:
                 with open(output, "r") as f:
                     trace = f.read()
-                if not any(k in trace.lower() for k in ("failure", "failures", "error", "backtrace")):
+                if outcome_signature(trace) == baseline_sig:
                     can_disable.append(simplification)
                 else:
+                    print(f"  Outcome changed for simplification {simplification}; mandatory.")
                     mandatory_error.append(simplification)
             except FileNotFoundError:
                 print(f"Error: Output file {output} not found.")
@@ -185,10 +204,37 @@ def process_wisl_file(wisl_path: str) -> dict | None:
 
     try:
         clear_output_file()
-        run_command(run_cmd, check=True)
-    except subprocess.CalledProcessError:
-        print(f"  Error running {wisl_path}; skipping.")
+        run_command(run_cmd)
+    except Exception as e:
+        print(f"  Error running {wisl_path} ({e}); skipping.")
         return None
+
+    try:
+        with open(output, "r") as f:
+            baseline_trace = f.read()
+    except FileNotFoundError:
+        print(f"  Output file {output} not found for {wisl_path}; skipping.")
+        return None
+
+    baseline_sig = outcome_signature(baseline_trace)
+    verdicts, failures, crashed = baseline_sig
+    if not verdicts:
+        print(f"  No specs verified for {wisl_path} (parse/compile error?); skipping.")
+        return None
+    n_fail = sum(1 for _, v in verdicts if v == "Failure")
+    in_errors_folder = any("errors" in part.lower() for part in Path(wisl_path).parts[:-1])
+    if not in_errors_folder and (n_fail > 0 or crashed):
+        reason = "crashed" if crashed else f"has {n_fail} failing spec(s)"
+        print(f"  Baseline run {reason} and {wisl_path} is not in an 'errors' folder; skipping.")
+        return None
+    if n_fail == 0:
+        print(f"  Baseline outcome: all {len(verdicts)} spec(s) succeeded.")
+    else:
+        print(f"  Baseline outcome: {n_fail}/{len(verdicts)} spec(s) failing (expected for error examples).")
+        for failure in failures:
+            print(f"    - {failure}")
+    if crashed:
+        print("  Warning: baseline run reports a crash/exception.")
 
     try:
         result = subprocess.run(
@@ -209,7 +255,7 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     processed_reductions = process_simplifications(reductions_array)
     print(f"  All simplifications found:     {processed_reductions}")
 
-    optional, mandatory_error, mandatory_timeout = test_reductions(processed_reductions, test_cmd)
+    optional, mandatory_error, mandatory_timeout = test_reductions(processed_reductions, test_cmd, baseline_sig)
 
     print(f"  Mandatory simplifications (error): {mandatory_error}")
     print(f"  Mandatory simplifications (timeout): {mandatory_timeout}")
@@ -269,14 +315,10 @@ def main():
         print(f"Error: '{folder}' is not a valid directory.")
         sys.exit(1)
 
-    all_wisl_files = sorted(folder.rglob("*.wisl"))
-    wisl_files = [p for p in all_wisl_files if "error" not in p.name.lower()]
+    wisl_files = sorted(folder.rglob("*.wisl"))
     if not wisl_files:
-        print(f"No .wisl files found under '{folder}' (after filtering 'error').")
+        print(f"No .wisl files found under '{folder}'.")
         sys.exit(0)
-    skipped = len(all_wisl_files) - len(wisl_files)
-    if skipped > 0:
-        print(f"Skipping {skipped} .wisl file(s) with 'error' in name.")
 
     print(f"Found {len(wisl_files)} .wisl file(s) under '{folder}'.")
     already_processed = load_already_processed(args.output_csv)
