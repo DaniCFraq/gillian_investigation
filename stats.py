@@ -1,151 +1,284 @@
 import subprocess
 import re
 import sys
+import csv
+import os
+import signal
+import argparse
+from pathlib import Path
 
-compile_cmd = "dune build"
-command = "dune exec -- wisl verify wisl/examples/SLL_iterative.wisl > program_trace.txt"
-file = "GillianCore/engine/FOLogic/Reduction.ml"
-output = "program_trace.txt"
-N = 30
+"""
+    Benchmark do impacto das simplificações, para todos os ficheiros
+    listados no CSV produzido pelo setup.py:
+      1º - Corre o exemplo N vezes com todas as simplificações ativas (baseline).
+      2º - Corre N vezes com todas as simplificações opcionais desativadas e compara.
+      3º - Análise individual: desativa uma simplificação opcional de cada vez
+           (a partir do estado normal, tudo ativo) e mede o impacto de a perder.
+    Os resultados são acrescentados a um CSV de saída; ficheiros já presentes
+    nesse CSV são ignorados (skip), por isso o benchmark pode ser retomado.
+"""
 
-line_to_replace = "let () = disable_reductions [ 158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001 ]"
+compile_cmd: str = "dune build"
+reduction_file: str = "GillianCore/engine/FOLogic/Reduction.ml"
+output: str = "program_trace.txt"
+original_line: str = "let () = disable_reductions []"
 
-numbers_str = "158; 156; 149; 146; 142; 102; 100; 060; 057; 056; 054; 052; 051; 042; 031; 030; 027; 026; 013; 011; 010; 004; 003; 002; 001"
-list_numbers = [n.strip() for n in numbers_str.split(";")]
+RUN_TIMEOUT = 60
+COMPILE_TIMEOUT = 600
+
+TIME_RE = re.compile(r"(?:All specs succeeded|There were failures):\s*([\d.]+)")
+TAG_RE = re.compile(r"\d[\d_]*")
 
 
-def change_code(new_list):
-    global line_to_replace
+def _killpg(pgid: int):
+    """Hard-kill an entire process group, ignoring it if it's already gone."""
     try:
-        with open(file, "r") as f:
-            content = f.read()
-    except FileNotFoundError:
-        print(f"Error: File {file} not found.")
-        sys.exit(1)
-    
-    new_list_str = "; ".join(new_list)
-    new_line = f"let () = disable_reductions [ {new_list_str} ]"
-
-    new_content = content.replace(line_to_replace, new_line)
-    with open(file, "w") as f:
-        f.write(new_content)
-    line_to_replace = new_line
+        os.killpg(pgid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
 
 
-def run_baseline():
-    print(f"=== A calcular o tempo de referência ({N} iterações) ===")
-    times = []
-
+def run_command(cmd: str, timeout: int | None = None, check: bool = False) -> int:
+    proc = subprocess.Popen(
+        cmd, shell=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    pgid = proc.pid
     try:
-        subprocess.run(compile_cmd, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        print("Compiling error no baseline.")
-        sys.exit(1)
-
-    for i in range(N):
+        returncode = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _killpg(pgid)
         try:
-            subprocess.run(command, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except subprocess.CalledProcessError:
-            print(f"Error at iteration {i + 1}")
-            continue
-
-        try:
-            with open(output, "r") as f:
-                content = f.read()
-
-            match = re.search(r"All specs succeeded:\s*([\d.]+)", content)
-            
-            if match:
-                time = float(match.group(1))
-                times.append(time)
-            else:
-                print(f"'All specs succeeded' not found at {i+1}")
-                
-        except FileNotFoundError:
-            print(f"Error: File {output} not found")
-            sys.exit(1)
-            
-        print(f"Baseline iteration {i+1}/{N} done...", end="\r")
-
-    print("\n")
-    if times:
-        avg = sum(times) / len(times)
-        max_t = max(times)
-        min_t = min(times)
-
-        print("--- Baseline Results ---")
-        print(f"Average: {avg:.6f}")
-        print(f"Maximum: {max_t:.6f}")
-        print(f"Minimum: {min_t:.6f}")
-        return avg
-    else:
-        print("Invalid times. Aborting.")
-        sys.exit(1)
-
-
-def run_config():
-    try:
-        subprocess.run(compile_cmd, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        print(" Compiling error")
-        return float('inf')
-
-    times = []
-    for _ in range(N):
-        subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            with open(output, "r") as f:
-                match = re.search(r"All specs succeeded:\s*([\d.]+)", f.read())
-                if match:
-                    times.append(float(match.group(1)))
-        except FileNotFoundError:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
             pass
+        raise
+    _killpg(pgid)
+    if check and returncode != 0:
+        raise subprocess.CalledProcessError(returncode, cmd)
+    return returncode
 
-    if times:
-        return sum(times) / len(times)
-    return float('inf')
+
+def make_run_cmd(wisl_path: str) -> str:
+    return f"dune exec -- wisl verify {wisl_path} -l disabled > {output}"
+
+
+def set_disabled(tags: list[str]):
+    """Patch Reduction.ml so exactly the given tags are disabled ([] = all enabled)."""
+    try:
+        content = Path(reduction_file).read_text()
+    except FileNotFoundError:
+        print(f"Error: File {reduction_file} not found.")
+        sys.exit(1)
+    if tags:
+        new_line = f"let () = disable_reductions [ {'; '.join(tags)} ]"
+    else:
+        new_line = original_line
+    new_content = re.sub(
+        r"let \(\) = disable_reductions \[.*?\]", new_line,
+        content, count=1, flags=re.DOTALL,
+    )
+    if new_content != content:
+        Path(reduction_file).write_text(new_content)
+
+
+def restore_reduction_file():
+    set_disabled([])
+
+
+def run_config(run_cmd: str, n: int, label: str) -> dict | None:
+    """
+    Compile, then run the example n times and collect the verification time
+    reported by the engine. Returns avg/min/max stats or None if no valid
+    time could be collected.
+    """
+    try:
+        run_command(compile_cmd, timeout=COMPILE_TIMEOUT, check=True)
+    except Exception as e:
+        print(f"  Compile error for {label}: {e}")
+        return None
+
+    times = []
+    timeouts = 0
+    for i in range(n):
+        print(f"  {label}: iteration {i + 1}/{n}...", end="\r", flush=True)
+        try:
+            run_command(run_cmd, timeout=RUN_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            timeouts += 1
+            continue
+        except Exception:
+            continue
+        try:
+            content = Path(output).read_text()
+        except FileNotFoundError:
+            continue
+        match = TIME_RE.search(content)
+        if match:
+            times.append(float(match.group(1)))
+    print()
+    if timeouts:
+        print(f"  {label}: {timeouts}/{n} run(s) hit the {RUN_TIMEOUT}s timeout.")
+    if not times:
+        print(f"  {label}: no valid times collected.")
+        return None
+    return {
+        "samples": len(times),
+        "avg": sum(times) / len(times),
+        "min": min(times),
+        "max": max(times),
+    }
+
+
+def benchmark_file(wisl_path: str, optional_tags: list[str], n: int) -> list[dict] | None:
+    run_cmd = make_run_cmd(wisl_path)
+    print(f"\n{'=' * 60}")
+    print(f"Benchmarking: {wisl_path} ({len(optional_tags)} optional simplification(s), N={n})")
+    print(f"{'=' * 60}")
+
+    restore_reduction_file()
+    baseline = run_config(run_cmd, n, "baseline (all enabled)")
+    if baseline is None:
+        print(f"  Could not benchmark {wisl_path}; skipping.")
+        return None
+    print(f"  baseline: avg {baseline['avg']:.6f}s  min {baseline['min']:.6f}s  max {baseline['max']:.6f}s")
+
+    rows = [{"file": wisl_path, "config": "baseline", "delta_pct": 0.0, **baseline}]
+
+    def add_row(config: str, stats: dict):
+        delta = (stats["avg"] - baseline["avg"]) / baseline["avg"] * 100
+        print(f"  {config}: avg {stats['avg']:.6f}s ({delta:+.1f}% vs baseline)")
+        rows.append({"file": wisl_path, "config": config, "delta_pct": delta, **stats})
+
+    if not optional_tags:
+        print("  No optional simplifications for this file; baseline only.")
+        return rows
+
+    set_disabled(optional_tags)
+    stats = run_config(run_cmd, n, "all optional disabled")
+    restore_reduction_file()
+    if stats is not None:
+        add_row("all_optional_disabled", stats)
+
+    for tag in optional_tags:
+        set_disabled([tag])
+        stats = run_config(run_cmd, n, f"disable {tag}")
+        restore_reduction_file()
+        if stats is not None:
+            add_row(f"disable_{tag}", stats)
+
+    tag_rows = [r for r in rows if r["config"].startswith("disable_")]
+    if tag_rows:
+        print("\n  Impact of disabling each simplification (slowest first):")
+        for r in sorted(tag_rows, key=lambda r: r["delta_pct"], reverse=True):
+            print(f"    {r['config'][len('disable_'):]:>12}: avg {r['avg']:.6f}s ({r['delta_pct']:+.1f}%)")
+    return rows
+
+
+def load_benchmark_targets(csv_path: str) -> list[tuple[str, list[str]]]:
+    """
+    Reads the setup.py results CSV and returns (file, optional_tags) pairs.
+    """
+    targets = []
+    with open(csv_path, "r", newline="") as f:
+        for row in csv.DictReader(f):
+            wisl_path = (row.get("file") or "").strip()
+            if not wisl_path:
+                continue
+            raw = (row.get("optional_simplifications") or "").strip()
+            tags = [t.strip() for t in raw.split(";") if t.strip()]
+            valid = [t for t in tags if TAG_RE.fullmatch(t)]
+            for bad in set(tags) - set(valid):
+                print(f"Warning: ignoring invalid tag {bad!r} for {wisl_path}.")
+            targets.append((wisl_path, valid))
+    return targets
+
+
+def load_already_benchmarked(csv_path: str) -> set[str]:
+    done = set()
+    csv_file = Path(csv_path)
+    if not csv_file.exists():
+        return done
+    with open(csv_file, "r", newline="") as f:
+        for row in csv.DictReader(f):
+            if row.get("file"):
+                done.add(row["file"])
+    return done
+
+
+def append_rows(rows: list[dict], csv_path: str):
+    csv_file = Path(csv_path)
+    write_header = not csv_file.exists()
+    with open(csv_file, "a", newline="") as f:
+        writer = csv.writer(f)
+        if write_header:
+            writer.writerow([
+                "file", "config", "samples",
+                "avg", "min", "max", "delta_vs_baseline_pct",
+            ])
+        for r in rows:
+            writer.writerow([
+                r["file"], r["config"], r["samples"],
+                f"{r['avg']:.6f}", f"{r['min']:.6f}", f"{r['max']:.6f}",
+                f"{r['delta_pct']:.2f}",
+            ])
 
 
 def main():
-    reference_time = run_baseline()
-    
-    print("\n=== A iniciar análise individual de simplificações ===")
-    print(f"Target Reference time: {reference_time:.6f}s\n")
+    parser = argparse.ArgumentParser(
+        description="Benchmark the timing impact of optional simplifications "
+                    "for every file listed in the setup.py results CSV."
+    )
+    parser.add_argument(
+        "--input-csv", default="file_simplification_results.csv",
+        help="CSV produced by setup.py (default: file_simplification_results.csv).",
+    )
+    parser.add_argument(
+        "--output-csv", default="stats_results.csv",
+        help="CSV to append benchmark results to (default: stats_results.csv).",
+    )
+    parser.add_argument(
+        "-n", "--iterations", type=int, default=30,
+        help="Number of timed runs per configuration (default: 30).",
+    )
+    args = parser.parse_args()
 
-    positive_simplifications = []
-    
-    for number in list_numbers:
-        if number in ["013"]:
-            continue
-            
-        print(f"Testing number {number}...", end="", flush=True)
+    if not Path(args.input_csv).exists():
+        print(f"Error: input CSV '{args.input_csv}' not found.")
+        sys.exit(1)
 
-        new_list = [n for n in list_numbers if n != number]
-        change_code(new_list)
+    targets = load_benchmark_targets(args.input_csv)
+    if not targets:
+        print(f"No files listed in '{args.input_csv}'.")
+        sys.exit(0)
 
-        avg = run_config()
-        print(f" Average: {avg:.6f}s")
+    print(f"Found {len(targets)} file(s) in '{args.input_csv}'.")
+    done = load_already_benchmarked(args.output_csv)
+    if done:
+        print(f"Skipping {len(done)} file(s) already in '{args.output_csv}'.")
 
-        if avg > reference_time:
-            positive_simplifications.append({
-                "simplification": number,
-                "average": avg
-            })
-            
-    change_code(list_numbers)
-
-    print("\n=== Resultados Finais ===")
-    if not positive_simplifications:
-        print(f"0 simplifications below {reference_time:.6f}s.")
-    else:
-        positive_simplifications.sort(key=lambda x: x["average"])
-        for res in positive_simplifications:
-            print(f"Simplificação {res['simplification']}: {res['average']:.6f}s")
+    try:
+        for wisl_path, tags in targets:
+            if wisl_path in done:
+                print(f"  [SKIP] {wisl_path} (already in CSV)")
+                continue
+            if not Path(wisl_path).exists():
+                print(f"  [MISSING] {wisl_path} not found on disk; skipping.")
+                continue
+            rows = benchmark_file(wisl_path, tags, args.iterations)
+            if rows:
+                append_rows(rows, args.output_csv)
+                print(f"  Results appended to: {args.output_csv}")
+    finally:
+        print("\nRestoring reduction file...")
+        restore_reduction_file()
+        print("Reduction file restored.")
 
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        change_code(list_numbers)
+        print("\nInterrupted by user.")
         sys.exit(0)
