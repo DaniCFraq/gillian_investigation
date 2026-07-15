@@ -2,9 +2,10 @@ Parsing and compiling...
 Preprocessing...
 Obtaining specs to verify...
 Obtaining lemmas to verify...
-Obtained 3 symbolic tests in total
-Running symbolic tests: 0.030028
-Verifying one spec of procedure sum_of_two_cells... s Success
-Verifying one spec of procedure read_cell... s Success
-Verifying one spec of procedure alloc_cell... s Success
-All specs succeeded: 0.052723
+Obtained 1 symbolic tests in total
+Running symbolic tests: 0.019542
+Verifying one spec of procedure main... f Failure
+There were failures: 0.020312
+Analysis failures!
+1. Use After Free [wisl/examples/active_examples/memory_errors/use_after_free_error.wisl 5:5-14]
+
