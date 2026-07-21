@@ -4,15 +4,25 @@ module NumToIntReductions
   use real.Truncate
   use real.FromInt
 
-  (* tag 117 - must not proven correctly *)
+  (* tag 117 - must not prove *)
   goal fplus_distrib_unsound:
     forall a b : real. floor (a +. b) = floor a + floor b
 
-  (* tag 118 - must not proven correctly *)
+  (* tag 118 - must not prove *)
   goal ftimes_distrib_unsound:
     forall a b : real. floor (a *. b) = floor a * floor b
 
-  (* possible fix? TODO*)
+  (* counterexamples *)
+  lemma cex_fplus:
+    floor (0.6 +. 0.5) <> floor 0.6 + floor 0.5
+
+  lemma cex_ftimes:
+    floor (1.5 *. 1.5) <> floor 1.5 * floor 1.5
+
+  (* the guarded fix: valid once the operands are known integral *)
   lemma fplus_guarded_sound:
     forall n : int, b : real. floor (from_int n +. b) = n + floor b
+
+  lemma ftimes_guarded_sound:
+    forall n m : int. floor (from_int n *. from_int m) = n * m
 end
