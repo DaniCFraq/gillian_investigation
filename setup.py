@@ -135,7 +135,7 @@ def test_reductions(simplifications, run_cmd, baseline_sig):
             print(f"Error: File {reduction_file} not found.")
             sys.exit(1)
 
-        new_line = f"let () = disable_reductions [ {simplification} ]"
+        new_line = f'let () = disable_reductions [ "{simplification}" ]'
         patched = content.replace(original_line, new_line)
         with open(reduction_file, "w") as f:
             f.write(patched)

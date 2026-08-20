@@ -69,7 +69,8 @@ def set_disabled(tags: list[str]):
         print(f"Error: File {reduction_file} not found.")
         sys.exit(1)
     if tags:
-        new_line = f"let () = disable_reductions [ {'; '.join(tags)} ]"
+        quoted = "; ".join('"%s"' % t for t in tags)
+        new_line = f"let () = disable_reductions [ {quoted} ]"
     else:
         new_line = original_line
     new_content = re.sub(

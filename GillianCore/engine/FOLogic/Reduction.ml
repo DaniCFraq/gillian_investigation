@@ -3,118 +3,20 @@
 (* When reduction fails *)
 exception ReductionException of Expr.t * string
 
-let disabled_reductions : int list ref = ref []
-let disable_reductions (ns : int list ) =
+let disabled_reductions : string list ref = ref []
+let disable_reductions (ns : string list ) =
     disabled_reductions := ns
 
 module L = Logging
 
-(* Source files that may contain [check_reduction] tags. The logger reads the
-   caller's source line to recover the human-readable tag (e.g. "600_1"), so any
-   file that calls [check_reduction] must be registered here. *)
-let tag_source_files =
-  [
-    ("Reduction.ml", "GillianCore/engine/FOLogic/Reduction.ml");
-    ("Simplifications.ml", "GillianCore/engine/FOLogic/Simplifications.ml");
-  ]
-
-let read_source_lines path =
-  try
-    let channel = open_in path in
-    let rec read_lines acc =
-      match input_line channel with
-      | line -> read_lines (line :: acc)
-      | exception End_of_file ->
-          close_in_noerr channel;
-          Array.of_list (List.rev acc)
-    in
-    read_lines []
-  with _ -> [||]
-
-let source_lines_cache : (string, string array) Hashtbl.t = Hashtbl.create 2
-
-let source_lines_for (basename : string) : string array =
-  match Hashtbl.find_opt source_lines_cache basename with
-  | Some lines -> lines
-  | None ->
-      let lines =
-        match List.assoc_opt basename tag_source_files with
-        | Some path -> read_source_lines path
-        | None -> [||]
-      in
-      Hashtbl.replace source_lines_cache basename lines;
-      lines
-
-let rec find_substring haystack needle index =
-  let haystack_len = String.length haystack in
-  let needle_len = String.length needle in
-  if index + needle_len > haystack_len then None
-  else if String.sub haystack index needle_len = needle then Some index
-  else find_substring haystack needle (index + 1)
-
-let is_reduction_tag_char = function
-  | '0' .. '9' | '_' -> true
-  | _ -> false
-
-let reduction_tag_from_line line =
-  match find_substring line "check_reduction" 0 with
-  | None -> None
-  | Some pos ->
-      let start = pos + String.length "check_reduction" in
-      let rec skip_spaces idx =
-        if idx < String.length line then
-          match line.[idx] with
-          | ' ' | '\t' -> skip_spaces (idx + 1)
-          | _ -> idx
-        else idx
-      in
-      let start = skip_spaces start in
-      let rec scan_end idx =
-        if idx < String.length line && is_reduction_tag_char line.[idx] then
-          scan_end (idx + 1)
-        else idx
-      in
-      let finish = scan_end start in
-      if finish > start then Some (String.sub line start (finish - start)) else None
-
-let reduction_tag_from_callstack () =
-  match Printexc.backtrace_slots (Printexc.get_callstack 8) with
-  | None -> None
-  | Some slots ->
-      Array.fold_left
-        (fun acc slot ->
-          match acc with
-          | Some _ -> acc
-          | None -> (
-              match Printexc.Slot.location slot with
-              | Some loc -> (
-                  let basename = Filename.basename loc.filename in
-                  match List.assoc_opt basename tag_source_files with
-                  | Some _ ->
-                      (* The definition lines of the tagging machinery itself do
-                         not contain a "check_reduction <n>" call site, so
-                         [reduction_tag_from_line] returns [None] for them; the
-                         first caller slot that holds a real tag wins. *)
-                      let lines = source_lines_for basename in
-                      let idx = loc.line_number - 1 in
-                      if idx >= 0 && idx < Array.length lines then
-                        reduction_tag_from_line lines.(idx)
-                      else None
-                  | None -> None)
-              | None -> None))
-        None slots
-
-let log_reduction (n : int) =
-  match reduction_tag_from_callstack () with
-  | Some tag -> L.normal (fun m -> m "[REDUCE_%s]" tag)
-  | None -> L.normal (fun m -> m "[REDUCE_%03d]" n)
+let log_reduction (n : string) = L.normal (fun m -> m "[REDUCE_%s]" n)
 
 (* normal *)
 let () = disable_reductions []
 
 exception ReductionDisabled 
 
-let check_reduction (n : int) =
+let check_reduction (n : string) =
   if List.mem n !disabled_reductions then raise ReductionDisabled;
   log_reduction n
 module CStore = Store.Make (CVal.M)
@@ -157,11 +59,11 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
       nles
   in
   let result : Expr.t =
-    check_reduction 400;
+    check_reduction "400";
     match nles with
-    | [] -> check_reduction 400_1; EList []
-    | [ x ] -> check_reduction 400_2; x
-    | _ -> check_reduction 400_3; NOp (LstCat, nles)
+    | [] -> check_reduction "400_1"; EList []
+    | [ x ] -> check_reduction "400_2"; x
+    | _ -> check_reduction "400_3"; NOp (LstCat, nles)
   in
   (* if result <> NOp (LstCat, les) then
      L.verbose (fun fmt ->
@@ -179,86 +81,86 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     let exn msg = ReductionException (le, msg) in
     match (le : Expr.t) with
     (* Literals **)
-    | Lit (LList lst) -> check_reduction 401; Expr.from_lit_list (LList lst)
+    | Lit (LList lst) -> check_reduction "401"; Expr.from_lit_list (LList lst)
     (* Literals, variables, alocs *)
-    | Lit _ | LVar _ | ALoc _ | PVar _ -> check_reduction 402; le
+    | Lit _ | LVar _ | ALoc _ | PVar _ -> check_reduction "402"; le
     (* Binary Operators **)
-    | NOp (LstCat, les) -> check_reduction 403; normalise_cat f les
+    | NOp (LstCat, les) -> check_reduction "403"; normalise_cat f les
     | BinOp (le, LstNth, n) -> (
-        check_reduction 404;
+        check_reduction "404";
         match (f le, f n) with
         | EList lst, Lit (Int n) -> (
             match List.nth_opt lst (Z.to_int n) with
-            | Some k -> check_reduction 404_1; k
-            | None -> check_reduction 404_2; raise (exn "Invalid List Expression"))
+            | Some k -> check_reduction "404_1"; k
+            | None -> check_reduction "404_2"; raise (exn "Invalid List Expression"))
         | NOp (LstCat, EList lst :: tl), Lit (Int n) -> (
             let n = Z.to_int n in
             match List_utils.nth_or_size lst n with
-            | Left k -> check_reduction 404_3; (* The element is in the first list *) k
+            | Left k -> check_reduction "404_3"; (* The element is in the first list *) k
             | Right sz ->
-                check_reduction 404_4;
+                check_reduction "404_4";
                 (* The element isn't in the first list, so we cut that part, and we got the size *)
                 BinOp (NOp (LstCat, tl), LstNth, Expr.int (n - sz)))
         | NOp (LstCat, LstSub (_lst, _start, len) :: tl), idx
-          when Expr.equal len idx -> check_reduction 404_5; Expr.list_nth (NOp (LstCat, tl)) 0
-        | _, Lit (Num _) -> check_reduction 404_6; raise (exn "LstNth with float")
-        | le, n -> check_reduction 404_7; BinOp (le, LstNth, n))
-    | BinOp (le1, op, le2) -> check_reduction 405; BinOp (f le1, op, f le2)
+          when Expr.equal len idx -> check_reduction "404_5"; Expr.list_nth (NOp (LstCat, tl)) 0
+        | _, Lit (Num _) -> check_reduction "404_6"; raise (exn "LstNth with float")
+        | le, n -> check_reduction "404_7"; BinOp (le, LstNth, n))
+    | BinOp (le1, op, le2) -> check_reduction "405"; BinOp (f le1, op, f le2)
     (* Unary Operators **)
     | UnOp (Car, lst) -> (
-        check_reduction 406;
+        check_reduction "406";
         match f lst with
         | EList lst -> (
-            try check_reduction 406_1; List.hd lst
+            try check_reduction "406_1"; List.hd lst
             with Failure _ ->
               raise
                 (ReductionException
                    (UnOp (Car, EList lst), "Invalid List Expression")))
         | NOp (LstCat, EList lst_l :: _) -> (
-            try check_reduction 406_2; List.hd lst_l
+            try check_reduction "406_2"; List.hd lst_l
             with Failure _ ->
               raise
                 (ReductionException (UnOp (Car, lst), "Invalid List Expression"))
             )
-        | lst -> check_reduction 406_3; UnOp (Car, lst))
+        | lst -> check_reduction "406_3"; UnOp (Car, lst))
     | UnOp (Cdr, lst) -> (
-        check_reduction 407;
+        check_reduction "407";
         match f lst with
         | EList lst -> (
-            try check_reduction 407_1; EList (List.tl lst)
+            try check_reduction "407_1"; EList (List.tl lst)
             with Failure _ ->
               raise
                 (ReductionException
                    (UnOp (Cdr, EList lst), "Invalid List Expression")))
         | NOp (LstCat, EList lst_l :: tl) -> (
-            try check_reduction 407_2; NOp (LstCat, EList (List.tl lst_l) :: tl)
+            try check_reduction "407_2"; NOp (LstCat, EList (List.tl lst_l) :: tl)
             with Failure _ ->
               raise
                 (ReductionException (UnOp (Cdr, lst), "Invalid List Expression"))
             )
-        | lst -> check_reduction 407_3; UnOp (Cdr, lst))
+        | lst -> check_reduction "407_3"; UnOp (Cdr, lst))
     | UnOp (LstLen, le) -> (
-        check_reduction 408;
+        check_reduction "408";
         match f le with
-        | EList lst -> check_reduction 408_1; Expr.int (List.length lst)
+        | EList lst -> check_reduction "408_1"; Expr.int (List.length lst)
         | NOp (LstCat, EList lst :: tl) ->
-            check_reduction 408_2;
+            check_reduction "408_2";
             BinOp
               ( Expr.int (List.length lst),
                 IPlus,
                 f (UnOp (LstLen, NOp (LstCat, tl))) )
-        | le -> check_reduction 408_3; UnOp (LstLen, le))
-    | UnOp (op, le) -> check_reduction 409; UnOp (op, f le)
-    | NOp (op, les) -> check_reduction 410; NOp (op, List.map f les)
+        | le -> check_reduction "408_3"; UnOp (LstLen, le))
+    | UnOp (op, le) -> check_reduction "409"; UnOp (op, f le)
+    | NOp (op, les) -> check_reduction "410"; NOp (op, List.map f les)
     (* Uninteresting cases **)
-    | EList lst -> check_reduction 411; EList (List.map f lst)
-    | ESet lst -> check_reduction 412; ESet (List.map f lst)
-    | LstSub (le1, le2, le3) -> check_reduction 413; LstSub (f le1, f le2, f le3)
-    | Exists (bt, le) -> check_reduction 414; Exists (bt, f le)
-    | ForAll (bt, le) -> check_reduction 415; ForAll (bt, f le)
-    | ConstructorApp (n, les) -> check_reduction 416; ConstructorApp (n, List.map f les)
-    | FuncApp (n, les) -> check_reduction 417; FuncApp (n, List.map f les)
-    | Cases (le, cs) -> check_reduction 418;
+    | EList lst -> check_reduction "411"; EList (List.map f lst)
+    | ESet lst -> check_reduction "412"; ESet (List.map f lst)
+    | LstSub (le1, le2, le3) -> check_reduction "413"; LstSub (f le1, f le2, f le3)
+    | Exists (bt, le) -> check_reduction "414"; Exists (bt, f le)
+    | ForAll (bt, le) -> check_reduction "415"; ForAll (bt, f le)
+    | ConstructorApp (n, les) -> check_reduction "416"; ConstructorApp (n, List.map f les)
+    | FuncApp (n, les) -> check_reduction "417"; FuncApp (n, List.map f les)
+    | Cases (le, cs) -> check_reduction "418";
         Cases (f le, List.map (fun (c, bs, le) -> (c, bs, f le)) cs)
     (*
     | LstSub(le1, le2, le3) ->
@@ -863,23 +765,23 @@ module Cint = Canonical.Make (struct
     let f = canonicalise in
     let open Expr.Infix in
     match e with
-    | BinOp (e1, IPlus, e2) -> check_reduction 200;
+    | BinOp (e1, IPlus, e2) -> check_reduction "200";
         let fe1, fe2 = sort (f e1) (f e2) in
         fe1 + fe2
     (* Binary minus to unary minus *)
-    | BinOp (e1, IMinus, e2) -> check_reduction 201; f (e1 + ineg e2)
-    | UnOp (IUnaryMinus, e) -> check_reduction 202; (
+    | BinOp (e1, IMinus, e2) -> check_reduction "201"; f (e1 + ineg e2)
+    | UnOp (IUnaryMinus, e) -> check_reduction "202"; (
         match f e with
-        | BinOp (e1, IPlus, e2) -> check_reduction 202_1; f (ineg e1) + f (ineg e2)
-        | ce -> check_reduction 202_2; UnOp (IUnaryMinus, ce))
-    | BinOp (e1, ITimes, e2) -> check_reduction 203; (
+        | BinOp (e1, IPlus, e2) -> check_reduction "202_1"; f (ineg e1) + f (ineg e2)
+        | ce -> check_reduction "202_2"; UnOp (IUnaryMinus, ce))
+    | BinOp (e1, ITimes, e2) -> check_reduction "203"; (
         match (f e1, f e2) with
-        | BinOp (e1, IPlus, e2), fe2 -> check_reduction 203_1; f ((e1 * fe2) + (e2 * fe2))
-        | fe1, BinOp (e1, IPlus, e2) -> check_reduction 203_2; f ((fe1 * e1) + (fe1 * e2))
-        | fe1, fe2 -> check_reduction 203_3;
+        | BinOp (e1, IPlus, e2), fe2 -> check_reduction "203_1"; f ((e1 * fe2) + (e2 * fe2))
+        | fe1, BinOp (e1, IPlus, e2) -> check_reduction "203_2"; f ((fe1 * e1) + (fe1 * e2))
+        | fe1, fe2 -> check_reduction "203_3";
             let fe1, fe2 = sort fe1 fe2 in
             fe1 * fe2)
-    | _ -> check_reduction 204; e
+    | _ -> check_reduction "204"; e
 end)
 
 module Cnum = Canonical.Make (struct
@@ -909,23 +811,23 @@ module Cnum = Canonical.Make (struct
     let f = canonicalise in
     let open Expr.Infix in
     match e with
-    | BinOp (e1, FPlus, e2) -> check_reduction 300;
+    | BinOp (e1, FPlus, e2) -> check_reduction "300";
         let fe1, fe2 = sort (f e1) (f e2) in
         fe1 +. fe2
     (* Binary minus to unary minus *)
-    | BinOp (e1, FMinus, e2) -> check_reduction 301; f (e1 +. fneg e2)
-    | UnOp (FUnaryMinus, e) -> check_reduction 302; (
+    | BinOp (e1, FMinus, e2) -> check_reduction "301"; f (e1 +. fneg e2)
+    | UnOp (FUnaryMinus, e) -> check_reduction "302"; (
         match f e with
-        | BinOp (e1, FPlus, e2) -> check_reduction 302_1; f (fneg e1) +. f (fneg e2)
-        | ce -> check_reduction 302_2; UnOp (FUnaryMinus, ce))
-    | BinOp (e1, FTimes, e2) -> check_reduction 303; (
+        | BinOp (e1, FPlus, e2) -> check_reduction "302_1"; f (fneg e1) +. f (fneg e2)
+        | ce -> check_reduction "302_2"; UnOp (FUnaryMinus, ce))
+    | BinOp (e1, FTimes, e2) -> check_reduction "303"; (
         match (f e1, f e2) with
-        | BinOp (e1, FPlus, e2), fe2 -> check_reduction 303_1; f ((e1 *. fe2) +. (e2 *. fe2))
-        | fe1, BinOp (e1, FPlus, e2) -> check_reduction 303_2; f ((fe1 *. e1) +. (fe1 *. e2))
-        | fe1, fe2 -> check_reduction 303_3;
+        | BinOp (e1, FPlus, e2), fe2 -> check_reduction "303_1"; f ((e1 *. fe2) +. (e2 *. fe2))
+        | fe1, BinOp (e1, FPlus, e2) -> check_reduction "303_2"; f ((fe1 *. e1) +. (fe1 *. e2))
+        | fe1, fe2 -> check_reduction "303_3";
             let fe1, fe2 = sort fe1 fe2 in
             fe1 *. fe2)
-    | _ -> check_reduction 304; e
+    | _ -> check_reduction "304"; e
 end)
 
 let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : Cint.t list =
@@ -1033,48 +935,48 @@ and reduce_lexpr_loop
               Base cases
        ------------------------- *)
     | Lit _ | PVar _ | ALoc _ ->
-        check_reduction 001; le
+        check_reduction "001"; le
     (* -------------------------
                  LVar
        ------------------------- *)
-    | LVar _ when reduce_lvars -> check_reduction 002;
+    | LVar _ when reduce_lvars -> check_reduction "002";
         get_equal_expressions pfs le
         |> List.find_opt (function
              | Expr.Lit _ -> true
              | _ -> false)
         |> Option.value ~default:le
-    | LVar _ -> check_reduction 003; le
+    | LVar _ -> check_reduction "003"; le
     (* -------------------------
                  EList
        ------------------------- *)
     | EList les ->
-        check_reduction 004;
+        check_reduction "004";
         List.map f les |> Expr.list
     (* -------------------------
                  ESet
        ------------------------- *)
-    | ESet les -> check_reduction 005;
+    | ESet les -> check_reduction "005";
         ESet (Expr.Set.elements @@ Expr.Set.of_list @@ List.map f les)
     (* -------------------------
              Constructors
        ------------------------- *)
-    | ConstructorApp (n, les) -> check_reduction 106; ConstructorApp (n, List.map f les)
+    | ConstructorApp (n, les) -> check_reduction "106"; ConstructorApp (n, List.map f les)
     (* -------------------------
          Function Application
        ------------------------- *)
-    | FuncApp (n, les) -> check_reduction 107; FuncApp (n, List.map f les)
+    | FuncApp (n, les) -> check_reduction "107"; FuncApp (n, List.map f les)
     (* -------------------------
                  Cases
        ------------------------- *)
     | Cases (ConstructorApp (c, les), cs) -> (
-        check_reduction 108;
+        check_reduction "108";
         let bles =
           List.filter_map
             (fun (c', bs, e) -> if c = c' then Some (bs, e) else None)
             cs
         in
         match bles with
-        | [ (bs, e) ] when List.length bs = List.length les -> check_reduction 108_1;
+        | [ (bs, e) ] when List.length bs = List.length les -> check_reduction "108_1";
             let le =
               List.fold_left2
                 (fun acc b le ->
@@ -1083,8 +985,8 @@ and reduce_lexpr_loop
                 e bs les
             in
             f le
-        | _ -> check_reduction 108_2; raise (ReductionException (le, "No case match found")))
-    | Cases (le, cs) -> check_reduction 109;
+        | _ -> check_reduction "108_2"; raise (ReductionException (le, "No case match found")))
+    | Cases (le, cs) -> check_reduction "109";
         let le' = f le in
         let f' = if not (Expr.equal le le') then f else Fun.id in
         let cs' = List.map (fun (c, bs, e) -> (c, bs, f e)) cs in
@@ -1107,7 +1009,7 @@ and reduce_lexpr_loop
       when Z.equal z Z.zero && String.equal x a && String.equal a b
            && String.equal b d
            && Int.equal (List.compare_length_with c (Z.to_int len)) 0 ->
-        check_reduction 006;
+        check_reduction "006";
         let rhs = Expr.EList (List_utils.make (Z.to_int len) e) in
         BinOp (EList c, Equal, rhs)
     (* Given:  l = [l0, l1, ..., ln]
@@ -1124,10 +1026,10 @@ and reduce_lexpr_loop
               BinOp (BinOp (l', LstNth, LVar i'''), Equal, k) ) )
       when Z.(equal z zero)
            && i = i' && i' = i'' && i'' = i''' && Expr.equal l l' ->
-        check_reduction 007;
+        check_reduction "007";
         List.map (Expr.Infix.( == ) k) ll |> Expr.conjunct
     | ForAll (bt, e) | Exists (bt, e) -> (
-        check_reduction 008;
+        check_reduction "008";
         (* We create a new pfs and gamma where:
            - All shadowed variables are substituted with a fresh variable
            - The gamma has been updated with the types given in the binder *)
@@ -1160,10 +1062,10 @@ and reduce_lexpr_loop
         let bt = List.filter (fun (b, _) -> Containers.SS.mem b vars) bt in
         (* We remove all quantifiers that aren't used anymore *)
         match (le, bt) with
-        | _, [] -> check_reduction 008_0; re
-        | ForAll _, _ -> check_reduction 008_1; ForAll (bt, re)
-        | Exists _, _ -> check_reduction 008_2; Exists (bt, re)
-        | _, _ -> check_reduction 008_3; failwith "Impossible.")
+        | _, [] -> check_reduction "008_0"; re
+        | ForAll _, _ -> check_reduction "008_1"; ForAll (bt, re)
+        | Exists _, _ -> check_reduction "008_2"; Exists (bt, re)
+        | _, _ -> check_reduction "008_3"; failwith "Impossible.")
     (* -------------------------
                  LstSub
        ------------------------- *)
@@ -1175,14 +1077,14 @@ and reduce_lexpr_loop
                       | Expr.LVar _ -> false
                       | _ -> true)
                     (find_equalities pfs x) ->
-                      check_reduction 010; true
+                      check_reduction "010"; true
            | _, (LVar _ as x)
              when List.exists
                     (function
                       | Expr.LVar _ -> false
                       | _ -> true)
-                    (find_equalities pfs x) -> check_reduction 010_1; true
-           | _ -> check_reduction 010_2; false ->
+                    (find_equalities pfs x) -> check_reduction "010_1"; true
+           | _ -> check_reduction "010_2"; false ->
         (* We (painfully) found out that we can substitute something
            from an LVar to a non-LVar -- now we do it, avoiding getting
            results more than once. *)
@@ -1233,7 +1135,7 @@ and reduce_lexpr_loop
                    && not (List.length r == 1 && Expr.equal (List.hd r) le)
                | _ -> false)
              eqs ->
-              check_reduction 011;
+              check_reduction "011";
         Logging.tmi (fun m -> m "REDUCTION: Case l-sub(l, n, (l-len l) - n)");
         get_equal_expressions pfs l
         |> List.find_map (function
@@ -1247,7 +1149,7 @@ and reduce_lexpr_loop
         |> Option.get
     | LstSub (e1, Lit (Int z), e3)
       when Z.equal z Z.zero
-           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> check_reduction 112; e1
+           && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> check_reduction "112"; e1
     | LstSub (e1, e2, e3)
       when SS.inter (Expr.lvars e1) (Expr.lvars e3) = SS.empty
            && List.length
@@ -1255,7 +1157,7 @@ and reduce_lexpr_loop
                    (fun e ->
                      SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty)
                    (get_equal_expressions pfs e1))
-              > 0 -> check_reduction 113;
+              > 0 -> check_reduction "113";
         let eqs = get_equal_expressions pfs e1 in
         let e1' =
           List.hd
@@ -1267,7 +1169,7 @@ and reduce_lexpr_loop
             fmt "Replacement LstSub: %a -> %a" Expr.pp e1 Expr.pp e1');
         LstSub (e1', e2, e3)
     | LstSub (le1, le2, le3) -> (
-        check_reduction 013;
+        check_reduction "013";
         let fle1 = f le1 in
         let fle2 = substitute_for_list_length pfs (f le2) in
         let fle3 = substitute_for_list_length pfs (f le3) in
@@ -1276,15 +1178,15 @@ and reduce_lexpr_loop
               Expr.pp fle3);
         match (fle1, fle2, fle3) with
         | _, _, Lit (Int z) when Z.equal z Z.zero ->
-            check_reduction 013_1; EList []
+            check_reduction "013_1"; EList []
         | flx, Lit (Int z), UnOp (LstLen, fle1)
           when Z.equal z Z.zero && Expr.equal flx fle1 ->
-            check_reduction 013_2; fle1
+            check_reduction "013_2"; fle1
         | NOp (LstCat, [ x ]), fle2, fle3 ->
-            check_reduction 013_3; f (LstSub (x, fle2, fle3))
+            check_reduction "013_3"; f (LstSub (x, fle2, fle3))
         | NOp (LstCat, flx :: _), Lit (Int z), UnOp (LstLen, fle1)
           when Z.equal z Z.zero && Expr.equal flx fle1 ->
-            check_reduction 013_4; fle1
+            check_reduction "013_4"; fle1
         | NOp (LstCat, flx :: _), Lit (Int z), Lit (Int n)
           when Z.equal z Z.zero
                &&
@@ -1316,7 +1218,7 @@ and reduce_lexpr_loop
                        ~size:(Expr.int_z n)
                    in
                    not (Expr.equal res le) ->
-            check_reduction 013_5;
+            check_reduction "013_5";
             let eqs = get_equal_expressions pfs flx in
             let first =
               List.find_map
@@ -1380,7 +1282,7 @@ and reduce_lexpr_loop
                        List.compare_length_with les (Z.to_int n) >= 0
                    | _ -> false)
                  eqs ->
-            check_reduction 013_6;
+            check_reduction "013_6";
             let eqs = get_equal_expressions pfs le in
             let first =
               List.find_map
@@ -1405,7 +1307,7 @@ and reduce_lexpr_loop
             Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
               ~size:(Expr.int_z n)
         | fle1, UnOp (LstLen, lx), fle3 when fst (list_prefix pfs lx fle1) ->
-            check_reduction 013_7;
+            check_reduction "013_7";
             let _, suffix = list_prefix pfs lx fle1 in
             LstSub (suffix, Expr.zero_i, fle3)
         | fle1, Lit (Int z), UnOp (LstLen, LVar lx)
@@ -1416,7 +1318,7 @@ and reduce_lexpr_loop
                         when String.equal lx lx' -> true
                       | _ -> false)
                     (get_equal_expressions pfs fle1) ->
-            check_reduction 013_8;
+            check_reduction "013_8";
             let choice =
               List.find_map
                 (fun e ->
@@ -1431,12 +1333,12 @@ and reduce_lexpr_loop
             Option.get choice
         | NOp (LstCat, EList les :: _), Lit (Int s), Lit (Int f)
           when List.compare_length_with les (Z.to_int s + Z.to_int f) >= 0 ->
-            check_reduction 013_9;
+            check_reduction "013_9";
             let result = Expr.LstSub (EList les, fle2, fle3) in
             L.verbose (fun fmt -> fmt "Very simple case: %a" Expr.pp result);
             result
         | EList lst, Lit (Int start), Lit (Int len) -> (
-            check_reduction 013_10;
+            check_reduction "013_10";
             L.verbose (fun fmt ->
                 fmt "EList LSub: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
             match List_utils.list_sub lst (Z.to_int start) (Z.to_int len) with
@@ -1451,7 +1353,7 @@ and reduce_lexpr_loop
                   (ReductionException
                      (LstSub (fle1, fle2, fle3), "Invalid List Expression")))
         | Lit (LList lst), Lit (Int start), Lit (Int len) -> (
-            check_reduction 013_11;
+            check_reduction "013_11";
             L.verbose (fun fmt ->
                 fmt "LList LSub: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
             match List_utils.list_sub lst (Z.to_int start) (Z.to_int len) with
@@ -1471,7 +1373,7 @@ and reduce_lexpr_loop
                let lel_len = Expr.UnOp (LstLen, lel) in
                let diff = f (BinOp (fle2, IMinus, lel_len)) in
                check_ge_zero_int ~top_level:true pfs diff = Some true ->
-            check_reduction 013_12;
+            check_reduction "013_12";
             L.verbose (fun fmt ->
                 fmt "LSUB: Start after first: %a" Expr.pp
                   (LstSub (fle1, fle2, fle3)));
@@ -1482,7 +1384,7 @@ and reduce_lexpr_loop
             new_lstsub
         | NOp (LstCat, EList lel :: ler), Lit (Int n), fle3 when Z.gt n Z.zero
           ->
-            check_reduction 013_13;
+            check_reduction "013_13";
             (* Sub starts inside first cat *)
             L.verbose (fun fmt ->
                 fmt "LSUB: Start inside first: %a" Expr.pp
@@ -1507,7 +1409,7 @@ and reduce_lexpr_loop
                let lel_len = Expr.UnOp (LstLen, lel) in
                let diff = f (BinOp (fle3, IMinus, lel_len)) in
                check_ge_zero_int ~top_level:true pfs diff = Some true ->
-            check_reduction 013_14;
+            check_reduction "013_14";
             L.verbose (fun fmt ->
                 fmt "LSUB: Contains first: %a" Expr.pp
                   (LstSub (fle1, fle2, fle3)));
@@ -1526,7 +1428,7 @@ and reduce_lexpr_loop
                 fmt "LSUB: Contains first result: %a" Expr.pp result);
             result
         | _ ->
-            check_reduction 013_15;
+            check_reduction "013_15";
             LstSub (fle1, fle2, fle3))
     (* -------------------------
                  UnOp
@@ -1536,15 +1438,15 @@ and reduce_lexpr_loop
     | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e))
     | UnOp (IUnaryMinus, UnOp (IUnaryMinus, e))
     | UnOp (LstLen, BinOp (_, LstRepeat, e))
-    | UnOp (LstLen, LstSub (_, _, e)) -> check_reduction 114; e
+    | UnOp (LstLen, LstSub (_, _, e)) -> check_reduction "114"; e
     | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))
-      -> check_reduction 115; le
+      -> check_reduction "115"; le
     (* Conversions *)
-    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) -> check_reduction 116;
+    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) -> check_reduction "116";
         BinOp (UnOp (IntToNum, le1), FPlus, UnOp (IntToNum, le2))
-    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) -> check_reduction 117;
+    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) -> check_reduction "117";
         BinOp (UnOp (NumToInt, le1), IPlus, UnOp (NumToInt, le2))
-    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) -> check_reduction 118;
+    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) -> check_reduction "118";
         BinOp (UnOp (NumToInt, le1), ITimes, UnOp (NumToInt, le2))
     | UnOp (IntToNum, UnOp (LstLen, x))
       when List.length
@@ -1554,7 +1456,7 @@ and reduce_lexpr_loop
                     | Expr.UnOp (NumToInt, _) -> true
                     | _ -> false))
            = 1 -> (
-        check_reduction 119;
+        check_reduction "119";
         L.verbose (fun fmt -> fmt "l-len conversion: %a" Expr.pp le);
         let eqs =
           get_equal_expressions pfs (UnOp (LstLen, x))
@@ -1564,14 +1466,14 @@ and reduce_lexpr_loop
                  | _ -> false)
         in
         match List.hd eqs with
-        | UnOp (NumToInt, e) -> check_reduction 119_1; e
-        | _ -> check_reduction 119_2; raise (ReductionException (le, "Impossible")))
+        | UnOp (NumToInt, e) -> check_reduction "119_1"; e
+        | _ -> check_reduction "119_2"; raise (ReductionException (le, "Impossible")))
     (* IsInt *)
-    | UnOp (IsInt, UnOp (IntToNum, _)) -> check_reduction 120; Lit (Bool true)
-    | UnOp (IsInt, Lit (Num n)) -> check_reduction 121; Lit (Bool (Float.is_integer n))
+    | UnOp (IsInt, UnOp (IntToNum, _)) -> check_reduction "120"; Lit (Bool true)
+    | UnOp (IsInt, Lit (Num n)) -> check_reduction "121"; Lit (Bool (Float.is_integer n))
     | UnOp (IsInt, BinOp (le', FPlus, re'))
     | UnOp (IsInt, BinOp (le', FMinus, re'))
-    | UnOp (IsInt, BinOp (le', FTimes, re')) -> check_reduction 122;
+    | UnOp (IsInt, BinOp (le', FTimes, re')) -> check_reduction "122";
         let resl = f (UnOp (IsInt, le')) in
         L.verbose (fun fmt ->
             fmt "is_int_reduction: %a\n\tlhs: %a" Expr.pp le Expr.pp resl);
@@ -1584,7 +1486,7 @@ and reduce_lexpr_loop
           else le
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
-        check_reduction 016;
+        check_reduction "016";
         let fle = f le in
         match fle with
         | Lit (Num _) -> fle
@@ -1594,105 +1496,105 @@ and reduce_lexpr_loop
             | true, Some NumberType -> fle
             | _, _ -> UnOp (ToNumberOp, UnOp (ToStringOp, fle))))
     | UnOp (LstRev, UnOp (LstRev, le)) ->
-        check_reduction 017;
+        check_reduction "017";
         le
     (* Less than and lessthaneq *)
     | UnOp (Not, BinOp (le1, FLessThan, le2)) ->
-        check_reduction 018;
+        check_reduction "018";
         BinOp (le2, FLessThanEqual, le1)
     | UnOp (Not, BinOp (le1, FLessThanEqual, le2)) ->
-        check_reduction 019;
+        check_reduction "019";
         BinOp (le2, FLessThan, le1)
     | UnOp (Not, BinOp (le1, ILessThan, le2)) ->
-        check_reduction 020;
+        check_reduction "020";
         BinOp (le2, ILessThanEqual, le1)
     | UnOp (Not, BinOp (le1, ILessThanEqual, le2)) ->
-        check_reduction 021;
+        check_reduction "021";
         BinOp (le2, ILessThan, le1)
     | UnOp (op, le) -> (
-        check_reduction 022;
+        check_reduction "022";
         let fle = f le in
         let def = Expr.UnOp (op, fle) in
         match (op, fle) with
         | _, Lit lit -> (
             L.normal (fun m -> m "[DEBUG] What is le = %a" Expr.pp fle);
-            check_reduction 022_1;
+            check_reduction "022_1";
             try Lit (CExprEval.evaluate_unop op lit) with
-            | CExprEval.TypeError err_msg -> check_reduction 022_28;
+            | CExprEval.TypeError err_msg -> check_reduction "022_28";
                 raise (ReductionException (def, err_msg))
-            | CExprEval.EvaluationError err_msg -> check_reduction 022_29;
+            | CExprEval.EvaluationError err_msg -> check_reduction "022_29";
                 raise (ReductionException (def, err_msg))
-            | e -> check_reduction 022_30; raise e)
-        | Not, UnOp (Not, ex) -> check_reduction 022_2; ex
-        | Not, BinOp (ex, And, ey) -> check_reduction 022_3; BinOp (UnOp (Not, ex), Or, UnOp (Not, ey))
-        | Not, BinOp (ex, Or, ey) -> check_reduction 022_4; BinOp (UnOp (Not, ex), And, UnOp (Not, ey))
-        | Not, _ -> check_reduction 022_5; def
+            | e -> check_reduction "022_30"; raise e)
+        | Not, UnOp (Not, ex) -> check_reduction "022_2"; ex
+        | Not, BinOp (ex, And, ey) -> check_reduction "022_3"; BinOp (UnOp (Not, ex), Or, UnOp (Not, ey))
+        | Not, BinOp (ex, Or, ey) -> check_reduction "022_4"; BinOp (UnOp (Not, ex), And, UnOp (Not, ey))
+        | Not, _ -> check_reduction "022_5"; def
         | TypeOf, _ -> (
-            check_reduction 022_6;
+            check_reduction "022_6";
             let tfle, how = Typing.type_lexpr gamma fle in
             match how with
             | false ->
-                check_reduction 022_6_1;
+                check_reduction "022_6_1";
                 let err_msg = "LTypeOf(le): expression is not typable." in
                 raise (ReductionException (def, err_msg))
             | true -> (
                 match tfle with
-                | None -> check_reduction 022_6_2; def
-                | Some t -> check_reduction 022_6_3; Lit (Type t)))
-        | Car, EList (hd :: _) -> check_reduction 022_7; hd
+                | None -> check_reduction "022_6_2"; def
+                | Some t -> check_reduction "022_6_3"; Lit (Type t)))
+        | Car, EList (hd :: _) -> check_reduction "022_7"; hd
         | Car, _ when lexpr_is_list gamma fle ->
-            check_reduction 022_8;
+            check_reduction "022_8";
             let ohdtl = get_head_and_tail_of_list ~pfs fle in
             Option.fold ~some:(fun (hd, _) -> f hd) ~none:def ohdtl
-        | Cdr, EList (_ :: tl) -> check_reduction 022_9; EList tl
+        | Cdr, EList (_ :: tl) -> check_reduction "022_9"; EList tl
         | Cdr, _ when lexpr_is_list gamma fle ->
-            check_reduction 022_10;
+            check_reduction "022_10";
             let ohdtl = get_head_and_tail_of_list ~pfs fle in
             Option.fold ~some:(fun (_, tl) -> f tl) ~none:def ohdtl
-        | LstLen, EList le -> check_reduction 022_11; Expr.int (List.length le)
-        | LstLen, NOp (LstCat, []) -> check_reduction 022_12; Expr.zero_i
+        | LstLen, EList le -> check_reduction "022_11"; Expr.int (List.length le)
+        | LstLen, NOp (LstCat, []) -> check_reduction "022_12"; Expr.zero_i
         | LstLen, NOp (LstCat, les) when lexpr_is_list gamma fle ->
-            check_reduction 022_13;
+            check_reduction "022_13";
             let les = List.map Expr.list_length les in
             List.fold_left Expr.Infix.( + ) (List.hd les) (List.tl les)
-        | LstLen, LstSub (_, _, len) when lexpr_is_list gamma fle -> check_reduction 022_14; len
-        | LstLen, UnOp (LstRev, le) -> check_reduction 022_15; UnOp (LstLen, f le)
-        | LstLen, _ when lexpr_is_list gamma fle -> check_reduction 022_16; def
-        | LstRev, EList le -> check_reduction 022_17; EList (List.rev le)
+        | LstLen, LstSub (_, _, len) when lexpr_is_list gamma fle -> check_reduction "022_14"; len
+        | LstLen, UnOp (LstRev, le) -> check_reduction "022_15"; UnOp (LstLen, f le)
+        | LstLen, _ when lexpr_is_list gamma fle -> check_reduction "022_16"; def
+        | LstRev, EList le -> check_reduction "022_17"; EList (List.rev le)
         | LstRev, NOp (LstCat, les) when lexpr_is_list gamma fle ->
-            check_reduction 022_18;
+            check_reduction "022_18";
             NOp (LstCat, List.rev_map (fun x -> Expr.UnOp (LstRev, x)) les)
-        | LstRev, _ when lexpr_is_list gamma fle -> check_reduction 022_19; def
+        | LstRev, _ when lexpr_is_list gamma fle -> check_reduction "022_19"; def
         | Car, _ | Cdr, _ | LstLen, _ | LstRev, _ ->
-            check_reduction 022_20;
+            check_reduction "022_20";
             let err_msg =
               Fmt.str "UnOp(%s, list): list is not a GIL list." (UnOp.str op)
             in
             raise (ReductionException (def, err_msg))
-        | SetToList, ESet le -> check_reduction 022_21; EList (Expr.Set.elements (Expr.Set.of_list le))
+        | SetToList, ESet le -> check_reduction "022_21"; EList (Expr.Set.elements (Expr.Set.of_list le))
         | StrLen, _ when lexpr_is_string gamma fle ->
-            check_reduction 022_22;
+            check_reduction "022_22";
             let len = get_length_of_string fle in
             Option.fold
               ~some:(fun len -> Expr.Lit (Num (float_of_int len)))
               ~none:def len
         | StrLen, _ ->
-            check_reduction 022_23;
+            check_reduction "022_23";
             let err_msg = "UnOp(StrLen, list): string is not a GIL string." in
             raise (ReductionException (def, err_msg))
         | FUnaryMinus, _ when lexpr_is_number ~gamma def ->
-            check_reduction 022_24;
+            check_reduction "022_24";
             simplify_num_arithmetic_lexpr pfs gamma def
         | IUnaryMinus, _ when lexpr_is_int ~gamma def ->
-            check_reduction 022_25;
+            check_reduction "022_25";
             simplify_int_arithmetic_lexpr pfs gamma def
         | IsInt, UnOp (IntToNum, e) -> 
-          check_reduction 022_26; (
+          check_reduction "022_26"; (
             match Typing.type_lexpr gamma e with
-            | Some IntType, _ -> check_reduction 022_26_1; Expr.true_
-            | Some _, _ -> check_reduction 022_26_2; Expr.false_
-            | None, _ -> check_reduction 022_26_3; BinOp (UnOp (TypeOf, e), Equal, Lit (Type IntType)))
-        | _, _ -> check_reduction 022_27; def)
+            | Some IntType, _ -> check_reduction "022_26_1"; Expr.true_
+            | Some _, _ -> check_reduction "022_26_2"; Expr.false_
+            | None, _ -> check_reduction "022_26_3"; BinOp (UnOp (TypeOf, e), Equal, Lit (Type IntType)))
+        | _, _ -> check_reduction "022_27"; def)
     (* -------------------------
                  NOp
        ------------------------- *)
@@ -1700,11 +1602,11 @@ and reduce_lexpr_loop
     (* l[0..n] ++ l[n..n+m] ++ rest <=> l[0..n+m] ++ rest *)
     | NOp (LstCat, LstSub (x1, Lit (Int z), z1) :: LstSub (x2, y2, z3) :: rest)
       when Z.equal z Z.zero && Expr.equal x1 x2 && Expr.equal z1 y2 ->
-        check_reduction 023;
+        check_reduction "023";
         NOp (LstCat, LstSub (x1, Expr.zero_i, Expr.Infix.( + ) z1 z3) :: rest)
     | NOp (LstCat, fst :: rest) when PFS.mem pfs (BinOp (fst, Equal, EList []))
       ->
-        check_reduction 024;
+        check_reduction "024";
         NOp (LstCat, rest)
     | NOp (LstCat, [ x; LstSub (LVar y, UnOp (LstLen, x'), len) ])
       when x = x'
@@ -1712,14 +1614,14 @@ and reduce_lexpr_loop
               = Cint.canonicalise
                   (BinOp (UnOp (LstLen, LVar y), IMinus, UnOp (LstLen, x)))
            && prefix_catch pfs x y ->
-        check_reduction 025;
+        check_reduction "025";
         LVar y
     | NOp (LstCat, les) ->
-        check_reduction 026;
+        check_reduction "026";
         normalise_cat f les
     (* Set union *)
     | NOp (SetUnion, les) -> (
-        check_reduction 027;
+        check_reduction "027";
         let fles = List.map f les in
         (* Flatten unions *)
         let fles =
@@ -1750,15 +1652,15 @@ and reduce_lexpr_loop
         in
         (* Remove duplicates *)
         match fles with
-        | [] -> check_reduction 027_1; ESet []
-        | [ x ] -> check_reduction 027_2; x
-        | _ -> check_reduction 027_3; NOp (SetUnion, fles))
+        | [] -> check_reduction "027_1"; ESet []
+        | [ x ] -> check_reduction "027_2"; x
+        | _ -> check_reduction "027_3"; NOp (SetUnion, fles))
     (* Set intersection *)
     | NOp (SetInter, [ BinOp (le1, SetDiff, le2); ESet le3 ]) ->
-        check_reduction 028;
+        check_reduction "028";
         NOp (SetInter, [ le2; BinOp (ESet le3, SetDiff, le1) ])
     | NOp (SetInter, les) -> (
-        check_reduction 029;
+        check_reduction "029";
         let fles = List.map f les in
         (* Flatten intersections *)
         let fles =
@@ -1779,13 +1681,13 @@ and reduce_lexpr_loop
         let lesets = List.concat lesets in
         (* Merge together, without duplicates *)
         match (lesets, rest) with
-        | [], _ -> check_reduction 029_1; ESet []
+        | [], _ -> check_reduction "029_1"; ESet []
         | _, [] ->
-            check_reduction 029_2;
+            check_reduction "029_2";
             let lesets = lesets |> Expr.Set.of_list |> Expr.Set.elements in
             Expr.ESet lesets
         | _ ->
-            check_reduction 029_3;
+            check_reduction "029_3";
             let lesets = lesets |> Expr.Set.of_list |> Expr.Set.elements in
             let rest = rest |> Expr.Set.of_list |> Expr.Set.elements in
             let fles = Expr.ESet lesets :: rest in
@@ -1796,7 +1698,7 @@ and reduce_lexpr_loop
        ------------------------- *)
     (* BinOps: Equalities (basics) *)
     | BinOp (e1, Equal, e2) when Expr.equal e1 e2 ->
-        check_reduction 030;
+        check_reduction "030";
         Expr.true_
     (* BinOps: Equalities (injective unops) *)
     | BinOp (UnOp (IUnaryMinus, e1), Equal, UnOp (IUnaryMinus, e2))
@@ -1806,23 +1708,23 @@ and reduce_lexpr_loop
     | BinOp (UnOp (LstRev, e1), Equal, UnOp (LstRev, e2))
     | BinOp (UnOp (IntToNum, e1), Equal, UnOp (IntToNum, e2))
     | BinOp (UnOp (ToStringOp, e1), Equal, UnOp (ToStringOp, e2)) ->
-        check_reduction 031;
+        check_reduction "031";
         BinOp (e1, Equal, e2)
     (* BinOps: Equalities (locations) *)
     (* This line is the central mechanism to "matching": *)
     | BinOp (ALoc x, Equal, ALoc y) when not matching ->
-        check_reduction 032;
+        check_reduction "032";
         Lit (Bool (x = y))
     | BinOp (ALoc _, Equal, Lit (Loc _)) | BinOp (Lit (Loc _), Equal, ALoc _) ->
-        check_reduction 033;
+        check_reduction "033";
         Expr.false_
     (* BinOps: Equalities (lists) *)
     | BinOp (Lit (LList ll), Equal, Lit (LList lr)) ->
-        check_reduction 034;
+        check_reduction "034";
         Expr.bool (ll = lr)
     | BinOp (EList le, Equal, Lit (LList ll))
     | BinOp (Lit (LList ll), Equal, EList le) ->
-        check_reduction 035;
+        check_reduction "035";
         if List.length ll <> List.length le then Expr.false_
         else if ll = [] then Expr.true_
         else
@@ -1830,13 +1732,13 @@ and reduce_lexpr_loop
           |> Expr.conjunct
     (* Z3 edge case: A list can't contain itself *)
     | BinOp (EList [ x ], Equal, y) when Expr.equal x y ->
-        check_reduction 036;
+        check_reduction "036";
         Expr.false_
     | BinOp (x, Equal, EList [ y ]) when Expr.equal x y ->
-        check_reduction 037;
+        check_reduction "037";
         Expr.false_
     | BinOp (EList ll, Equal, EList lr) ->
-        check_reduction 038;
+        check_reduction "038";
         if List.length ll <> List.length lr then Expr.(false_)
         else if ll = [] then Expr.(true_)
         else List.map2 Expr.Infix.( == ) ll lr |> Expr.conjunct
@@ -1848,45 +1750,45 @@ and reduce_lexpr_loop
                   | Expr.EList (_ :: _) | Lit (LList (_ :: _)) -> true
                   | _ -> false)
                 les ->
-                check_reduction 039;
+                check_reduction "039";
         Expr.false_
     (* l[0..n] = l <=> n = len(l)  *)
     | BinOp (LstSub (e1, Lit (Int z), el), Equal, e2)
-      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction 040;
+      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction "040";
         BinOp (UnOp (LstLen, e1), Equal, el)
     | BinOp (e2, Equal, LstSub (e1, Lit (Int z), el))
-      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction 041;
+      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction "041";
         BinOp (UnOp (LstLen, e1), Equal, el)
     (* (l ++ ...)[0..n] = l  <==> n = len(l) *)
     | BinOp (e2, Equal, LstSub (NOp (LstCat, e1 :: _), Lit (Int z), el))
-      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction 042;
+      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction "042";
         BinOp (UnOp (LstLen, e1), Equal, el)
     | BinOp (LstSub (NOp (LstCat, e1 :: _), Lit (Int z), el), Equal, e2)
-      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction 043;
+      when Z.equal z Z.zero && Expr.equal e1 e2 -> check_reduction "043";
         BinOp (UnOp (LstLen, e1), Equal, el)
     (* l = (l1 ++ l ++ ...)[n..m] <=> n = len(l1) /\ m = len(l) *)
     | BinOp (e2, Equal, LstSub (NOp (LstCat, e3 :: e1 :: _), ex, ey))
-      when Expr.equal e1 e2 -> check_reduction 044;
+      when Expr.equal e1 e2 -> check_reduction "044";
         BinOp
           ( BinOp (UnOp (LstLen, e3), Equal, ex),
             And,
             BinOp (UnOp (LstLen, e1), Equal, ey) )
     | BinOp (LstSub (NOp (LstCat, e3 :: e1 :: _), ex, ey), Equal, e2)
-      when Expr.equal e1 e2 -> check_reduction 045;
+      when Expr.equal e1 e2 -> check_reduction "045";
         BinOp
           ( BinOp (UnOp (LstLen, e3), Equal, ex),
             And,
             BinOp (UnOp (LstLen, e1), Equal, ey) )
     (* l ++ l1 = l ++ l2 <=> l1 = l2 *)
     | BinOp (NOp (LstCat, fl :: rl), Equal, NOp (LstCat, fr :: rr))
-      when Expr.equal fl fr -> check_reduction 046; BinOp (NOp (LstCat, rl), Equal, NOp (LstCat, rr))
+      when Expr.equal fl fr -> check_reduction "046"; BinOp (NOp (LstCat, rl), Equal, NOp (LstCat, rr))
     (* la ++ ... ++ l = lb ++ ... ++ l <=> la ++ ... = lb ++ ... *)
     | BinOp
         ( NOp (LstCat, (_ :: (_ :: _ as rl) as fl)),
           Equal,
           NOp (LstCat, (_ :: (_ :: _ as rr) as fr)) )
       when let last l = List.hd @@ List.rev l in
-           Expr.equal (last rl) (last rr) -> check_reduction 047;
+           Expr.equal (last rl) (last rr) -> check_reduction "047";
         let rem_last l = List.rev @@ List.tl @@ List.rev l in
         BinOp (NOp (LstCat, rem_last fl), Equal, NOp (LstCat, rem_last fr))
     (* l = l[0..s] ++ ... /\ len(l) < s <=> false *)
@@ -1895,7 +1797,7 @@ and reduce_lexpr_loop
           Equal,
           NOp (LstCat, LstSub (LVar lst', Lit (Int z), split) :: _) )
       when Z.equal z Z.zero && String.equal lst lst'
-           && PFS.mem pfs (BinOp (UnOp (LstLen, LVar lst), ILessThan, split)) -> check_reduction 048;
+           && PFS.mem pfs (BinOp (UnOp (LstLen, LVar lst), ILessThan, split)) -> check_reduction "048";
         Expr.false_
     (* l U {x} = l' U {x} /\ x ∉ l /\ x ∉ l' <=> l = l' *)
     | BinOp
@@ -1904,7 +1806,7 @@ and reduce_lexpr_loop
           NOp (SetUnion, [ rs; ESet [ rx ] ]) )
       when lx = rx
            && PFS.mem pfs (UnOp (Not, BinOp (lx, SetMem, ls)))
-           && PFS.mem pfs (UnOp (Not, BinOp (lx, SetMem, rs))) -> check_reduction 049;
+           && PFS.mem pfs (UnOp (Not, BinOp (lx, SetMem, rs))) -> check_reduction "049";
         BinOp (ls, Equal, rs)
     (* BinOps: Equalities (maths) *)
     (* These always map to a boolean so no need for =.
@@ -1925,27 +1827,27 @@ and reduce_lexpr_loop
                | Impl
                | SetMem
                | SetSub ),
-               _ ) as e) ) -> check_reduction 050; e
-    | BinOp (Lit (Bool false), Equal, BinOp (e1, ILessThan, e2)) -> check_reduction 051;
+               _ ) as e) ) -> check_reduction "050"; e
+    | BinOp (Lit (Bool false), Equal, BinOp (e1, ILessThan, e2)) -> check_reduction "051";
         BinOp (e2, ILessThanEqual, e1)
-    | BinOp (Lit (Bool false), Equal, BinOp (e1, ILessThanEqual, e2)) -> check_reduction 052;
+    | BinOp (Lit (Bool false), Equal, BinOp (e1, ILessThanEqual, e2)) -> check_reduction "052";
         BinOp (e2, ILessThan, e1)
-    | BinOp (Lit (Bool false), Equal, BinOp (e1, FLessThan, e2)) -> check_reduction 053;
+    | BinOp (Lit (Bool false), Equal, BinOp (e1, FLessThan, e2)) -> check_reduction "053";
         BinOp (e2, FLessThanEqual, e1)
-    | BinOp (Lit (Bool false), Equal, BinOp (e1, FLessThanEqual, e2)) -> check_reduction 054;
+    | BinOp (Lit (Bool false), Equal, BinOp (e1, FLessThanEqual, e2)) -> check_reduction "054";
         BinOp (e2, FLessThan, e1)
     | BinOp
         (* x + (-y) = 0f <=> x = y *)
         (BinOp (LVar x, FPlus, UnOp (FUnaryMinus, LVar y)), Equal, Lit (Num 0.))
-      -> check_reduction 055; BinOp (LVar x, Equal, LVar y)
+      -> check_reduction "055"; BinOp (LVar x, Equal, LVar y)
     | BinOp
         (* x + (-y) = 0i <=> x = y *)
         (BinOp (LVar x, IPlus, UnOp (IUnaryMinus, LVar y)), Equal, Lit (Int z))
-      when Z.equal z Z.zero -> check_reduction 056; BinOp (LVar x, Equal, LVar y)
+      when Z.equal z Z.zero -> check_reduction "056"; BinOp (LVar x, Equal, LVar y)
     | BinOp (BinOp (Lit (Num x), FPlus, LVar y), Equal, LVar z)
-      when x <> 0. && String.equal y z -> check_reduction 057; Expr.false_
+      when x <> 0. && String.equal y z -> check_reduction "057"; Expr.false_
     | BinOp (BinOp (Lit (Int x), IPlus, LVar y), Equal, LVar z)
-      when (not (Z.equal x Z.zero)) && String.equal y z -> check_reduction 058; Expr.false_
+      when (not (Z.equal x Z.zero)) && String.equal y z -> check_reduction "058"; Expr.false_
     (* FIXME: INTEGER BYTE-BY-BYTE BREAKDOWN *)
     (* 256 * b1 + b0 = n /\ b0,b1 ∈ [0;256[ <==> b1 = n/256 /\ b0 = n-b1
        Opale: The b0 = n-b1 bit is weird?? Why not mod? *)
@@ -1961,7 +1863,7 @@ and reduce_lexpr_loop
            && PFS.mem pfs (BinOp (Expr.zero_i, ILessThanEqual, b0))
            && PFS.mem pfs (BinOp (Expr.zero_i, ILessThanEqual, b1))
            && PFS.mem pfs (BinOp (b0, ILessThan, Lit (Int _256)))
-           && PFS.mem pfs (BinOp (b1, ILessThan, Lit (Int _256))) -> check_reduction 059;
+           && PFS.mem pfs (BinOp (b1, ILessThan, Lit (Int _256))) -> check_reduction "059";
         if Z.gt n _65535 then Expr.false_
         else
           let vb1 = Z.div n _256 in
@@ -1982,7 +1884,7 @@ and reduce_lexpr_loop
            && PFS.mem pfs (BinOp (Expr.zero_i, ILessThanEqual, b0))
            && PFS.mem pfs (BinOp (Expr.zero_i, ILessThanEqual, b1))
            && PFS.mem pfs (BinOp (b0, ILessThan, Lit (Int _256)))
-           && PFS.mem pfs (BinOp (b1, ILessThan, Lit (Int _256))) -> check_reduction 060;
+           && PFS.mem pfs (BinOp (b1, ILessThan, Lit (Int _256))) -> check_reduction "060";
         if Z.gt n _65535 then Expr.false_
         else
           let vb1 = Z.div n _256 in
@@ -1992,29 +1894,29 @@ and reduce_lexpr_loop
               And,
               BinOp (b0, Equal, Lit (Int vb0)) )
     | BinOp (BinOp (e, FTimes, Lit (Num x)), Equal, Lit (Num 0.)) when x <> 0.
-      -> check_reduction 061; BinOp (e, Equal, Lit (Num 0.))
+      -> check_reduction "061"; BinOp (e, Equal, Lit (Num 0.))
     | BinOp (BinOp (Lit (Num x), FTimes, e), Equal, Lit (Num 0.)) when x <> 0.
-      -> check_reduction 062; BinOp (e, Equal, Lit (Num 0.))
+      -> check_reduction "062"; BinOp (e, Equal, Lit (Num 0.))
     | BinOp (BinOp (e, ITimes, Lit (Int x)), Equal, Lit (Int n))
-      when Z.equal n Z.zero && not (Z.equal x Z.zero) -> check_reduction 063;
+      when Z.equal n Z.zero && not (Z.equal x Z.zero) -> check_reduction "063";
         BinOp (e, Equal, Expr.zero_i)
     | BinOp (BinOp (Lit (Int x), ITimes, e), Equal, Lit (Int n))
-      when Z.equal n Z.zero && not (Z.equal x Z.zero) -> check_reduction 064;
+      when Z.equal n Z.zero && not (Z.equal x Z.zero) -> check_reduction "064";
         BinOp (e, Equal, Expr.zero_i)
     | BinOp (BinOp (a, FTimes, b), FMod, c)
-      when Expr.equal a c || Expr.equal b c -> check_reduction 065; Expr.num 0.
-    | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> check_reduction 066; y
-    | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> check_reduction 067; x
+      when Expr.equal a c || Expr.equal b c -> check_reduction "065"; Expr.num 0.
+    | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> check_reduction "066"; y
+    | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> check_reduction "067"; x
     | BinOp (UnOp (NumToInt, x), Equal, y)
-      when (check_reduction 123;
+      when (check_reduction "123";
             match y with
-            | UnOp (LstLen, _) -> check_reduction 123_1; false
-            | _ -> check_reduction 123_2; true) -> BinOp (UnOp (IntToNum, y), Equal, x)
+            | UnOp (LstLen, _) -> check_reduction "123_1"; false
+            | _ -> check_reduction "123_2"; true) -> BinOp (UnOp (IntToNum, y), Equal, x)
     | BinOp (y, Equal, UnOp (NumToInt, x))
-      when (check_reduction 124;
+      when (check_reduction "124";
             match y with
-            | UnOp (LstLen, _) -> check_reduction 124_1; false
-            | _ -> check_reduction 124_2; true) -> BinOp (UnOp (IntToNum, y), Equal, x)
+            | UnOp (LstLen, _) -> check_reduction "124_1"; false
+            | _ -> check_reduction "124_2"; true) -> BinOp (UnOp (IntToNum, y), Equal, x)
     (* BinOps: Equalities (strings) *)
     (* x = y ++ z
           /\ |x| < |y| => false
@@ -2022,31 +1924,31 @@ and reduce_lexpr_loop
           /\ |x| > |y| => x[0..|y|] = y /\ x[|y|..] = z *)
     | BinOp (Lit (String ls), Equal, BinOp (Lit (String rs), StrCat, s))
     | BinOp (BinOp (Lit (String rs), StrCat, s), Equal, Lit (String ls)) -> (
-        check_reduction 069;
+        check_reduction "069";
         let lls = String.length ls in
         let lrs = String.length rs in
         match Stdlib.compare lls lrs with
-        | -1 -> check_reduction 069_1; Expr.false_
-        | 0 when ls <> rs -> check_reduction 069_2; Expr.false_
-        | 0 -> check_reduction 069_3; BinOp (s, Equal, Lit (String ""))
-        | 1 when not (String.starts_with ~prefix:rs ls) -> check_reduction 069_4; Expr.false_
-        | 1 -> check_reduction 069_5; BinOp (s, Equal, Lit (String (String.sub ls lrs (lls - lrs))))
-        | _ -> check_reduction 069_6; raise (Exceptions.Impossible "int comparison not in {-1, 0, 1}"))
+        | -1 -> check_reduction "069_1"; Expr.false_
+        | 0 when ls <> rs -> check_reduction "069_2"; Expr.false_
+        | 0 -> check_reduction "069_3"; BinOp (s, Equal, Lit (String ""))
+        | 1 when not (String.starts_with ~prefix:rs ls) -> check_reduction "069_4"; Expr.false_
+        | 1 -> check_reduction "069_5"; BinOp (s, Equal, Lit (String (String.sub ls lrs (lls - lrs))))
+        | _ -> check_reduction "069_6"; raise (Exceptions.Impossible "int comparison not in {-1, 0, 1}"))
     (* a ++ b = a ++ c <=> b = c  *)
     | BinOp (BinOp (sl1, StrCat, sr1), Equal, BinOp (sl2, StrCat, sr2))
-      when sl1 = sl2 -> check_reduction 070; BinOp (sr1, Equal, sr2)
+      when sl1 = sl2 -> check_reduction "070"; BinOp (sr1, Equal, sr2)
     | BinOp (BinOp (sl1, StrCat, sr1), Equal, BinOp (sl2, StrCat, sr2))
-      when sr1 = sr2 -> check_reduction 071; BinOp (sl1, Equal, sl2)
+      when sr1 = sr2 -> check_reduction "071"; BinOp (sl1, Equal, sl2)
     (* a ++ b = a <=> b = "" *)
-    | BinOp (BinOp (sl, StrCat, sr), Equal, s) when sl = s -> check_reduction 072;
+    | BinOp (BinOp (sl, StrCat, sr), Equal, s) when sl = s -> check_reduction "072";
         BinOp (sr, Equal, Lit (String ""))
-    | BinOp (BinOp (sl, StrCat, sr), Equal, s) when sr = s -> check_reduction 073;
+    | BinOp (BinOp (sl, StrCat, sr), Equal, s) when sr = s -> check_reduction "073";
         BinOp (sl, Equal, Lit (String ""))
-    | BinOp (s, Equal, BinOp (sl, StrCat, sr)) when sl = s -> check_reduction 074;
+    | BinOp (s, Equal, BinOp (sl, StrCat, sr)) when sl = s -> check_reduction "074";
         BinOp (sr, Equal, Lit (String ""))
-    | BinOp (s, Equal, BinOp (sl, StrCat, sr)) when sr = s -> check_reduction 075;
+    | BinOp (s, Equal, BinOp (sl, StrCat, sr)) when sr = s -> check_reduction "075";
         BinOp (sl, Equal, Lit (String ""))
-    | BinOp (BinOp (sl, StrCat, sr), Equal, Lit (String "")) -> check_reduction 076;
+    | BinOp (BinOp (sl, StrCat, sr), Equal, Lit (String "")) -> check_reduction "076";
         BinOp
           ( BinOp (sl, Equal, Lit (String "")),
             And,
@@ -2054,81 +1956,81 @@ and reduce_lexpr_loop
     (* by injectivity *)
     | BinOp (UnOp (ToStringOp, le1), Equal, Lit (String s))
     | BinOp (Lit (String s), Equal, UnOp (ToStringOp, le1)) -> (
-        check_reduction 077;
+        check_reduction "077";
         match s with
-        | "" -> check_reduction 077_1; Expr.false_
-        | "Infinity" | "-Infinity" | "NaN" -> check_reduction 077_2; le
+        | "" -> check_reduction "077_1"; Expr.false_
+        | "Infinity" | "-Infinity" | "NaN" -> check_reduction "077_2"; le
         | _ -> (
-            check_reduction 077_3;
+            check_reduction "077_3";
             try Expr.BinOp (le1, Equal, Lit (Num (Float.of_string s)))
             with _ -> Expr.false_))
     (* BinOps: Equalities (Empty?) *)
     | BinOp (Lit Empty, Equal, e) | BinOp (e, Equal, Lit Empty) -> (
-        check_reduction 078;
+        check_reduction "078";
         match e with
-        | Lit l when l <> Empty -> check_reduction 078_1; Expr.false_
-        | EList _ | ESet _ -> check_reduction 078_2; Expr.false_
-        | _ -> check_reduction 078_3; le)
-    | BinOp (Lit l1, Equal, Lit l2) -> check_reduction 079; Expr.bool (l1 = l2)
-    | BinOp (Lit Nono, Equal, PVar _) | BinOp (PVar _, Equal, Lit Nono) -> check_reduction 080; le
+        | Lit l when l <> Empty -> check_reduction "078_1"; Expr.false_
+        | EList _ | ESet _ -> check_reduction "078_2"; Expr.false_
+        | _ -> check_reduction "078_3"; le)
+    | BinOp (Lit l1, Equal, Lit l2) -> check_reduction "079"; Expr.bool (l1 = l2)
+    | BinOp (Lit Nono, Equal, PVar _) | BinOp (PVar _, Equal, Lit Nono) -> check_reduction "080"; le
     (* JOSE: Why are we considering the case of a logical variable being bound to None? *)
     | BinOp (Lit Nono, Equal, LVar x) | BinOp (LVar x, Equal, Lit Nono) -> (
-        check_reduction 081;
+        check_reduction "081";
         match Type_env.get gamma x with
-        | None | Some NoneType -> check_reduction 081_1; le
-        | _ -> check_reduction 081_2; Expr.false_)
+        | None | Some NoneType -> check_reduction "081_1"; le
+        | _ -> check_reduction "081_2"; Expr.false_)
     | BinOp (Lit Nono, Equal, e) | BinOp (e, Equal, Lit Nono) -> (
-        check_reduction 082;
+        check_reduction "082";
         let fe = f e in
         match fe with
-        | Lit Nono -> check_reduction 082_1; Expr.true_
-        | Lit _ -> check_reduction 082_2; Expr.false_
+        | Lit Nono -> check_reduction "082_1"; Expr.true_
+        | Lit _ -> check_reduction "082_2"; Expr.false_
         | LVar x when Type_env.get gamma x = Some NoneType ->
-            check_reduction 082_3; BinOp (Lit Nono, Equal, fe)
-        | PVar _ -> check_reduction 082_4; BinOp (Lit Nono, Equal, fe)
-        | LVar _ -> check_reduction 082_5; Expr.false_
-        | _ -> check_reduction 082_6; Expr.false_)
+            check_reduction "082_3"; BinOp (Lit Nono, Equal, fe)
+        | PVar _ -> check_reduction "082_4"; BinOp (Lit Nono, Equal, fe)
+        | LVar _ -> check_reduction "082_5"; Expr.false_
+        | _ -> check_reduction "082_6"; Expr.false_)
     (* BinOps: Equalities (typing) *)
     | BinOp (UnOp (TypeOf, BinOp (_, StrCat, _)), Equal, Lit (Type t))
-      when t <> StringType -> check_reduction 083; Expr.false_
+      when t <> StringType -> check_reduction "083"; Expr.false_
     | BinOp (UnOp (TypeOf, BinOp (_, SetMem, _)), Equal, Lit (Type t))
-      when t <> BooleanType -> check_reduction 084; Expr.false_
+      when t <> BooleanType -> check_reduction "084"; Expr.false_
     (* BinOps: Equalities (Constructors) *)
     | BinOp (ConstructorApp (ln, lles), Equal, ConstructorApp (rn, rles)) ->
-        check_reduction 110;
+        check_reduction "110";
         if ln = rn && List.length lles = List.length rles then (
-          check_reduction 110_1;
+          check_reduction "110_1";
           Expr.conjunct
             (List.map2 (fun le re -> Expr.BinOp (le, Equal, re)) lles rles))
-        else (check_reduction 110_2; Expr.false_)
+        else (check_reduction "110_2"; Expr.false_)
     | BinOp (ConstructorApp _, Equal, rle) as le -> (
-        check_reduction 111;
+        check_reduction "111";
         match rle with
-        | LVar _ | ConstructorApp _ | FuncApp _ | Cases _ -> check_reduction 111_1; le
-        | _ -> check_reduction 111_2; Expr.false_)
+        | LVar _ | ConstructorApp _ | FuncApp _ | Cases _ -> check_reduction "111_1"; le
+        | _ -> check_reduction "111_2"; Expr.false_)
     (* BinOps: Logic *)
     | BinOp (Lit (Bool true), And, e)
     | BinOp (e, And, Lit (Bool true))
     | BinOp (Lit (Bool false), Or, e)
     | BinOp (e, Or, Lit (Bool false))
-    | BinOp (Lit (Bool true), Impl, e) -> check_reduction 085; e
-    | BinOp (Lit (Bool false), And, _) | BinOp (_, And, Lit (Bool false)) -> check_reduction 086;
+    | BinOp (Lit (Bool true), Impl, e) -> check_reduction "085"; e
+    | BinOp (Lit (Bool false), And, _) | BinOp (_, And, Lit (Bool false)) -> check_reduction "086";
         Expr.false_
     | BinOp (Lit (Bool true), Or, _)
     | BinOp (_, Or, Lit (Bool true))
     | BinOp (Lit (Bool false), Impl, _)
-    | BinOp (_, Impl, Lit (Bool true)) -> check_reduction 087; Expr.true_
-    | BinOp (left, Impl, Lit (Bool false)) -> check_reduction 088; UnOp (Not, left)
+    | BinOp (_, Impl, Lit (Bool true)) -> check_reduction "087"; Expr.true_
+    | BinOp (left, Impl, Lit (Bool false)) -> check_reduction "088"; UnOp (Not, left)
     | BinOp (left, Impl, right) -> (
-        check_reduction 089;
+        check_reduction "089";
         match f left with
-        | Lit (Bool true) -> check_reduction 089_1; right
-        | Lit (Bool false) -> check_reduction 089_2; Expr.true_
+        | Lit (Bool true) -> check_reduction "089_1"; right
+        | Lit (Bool false) -> check_reduction "089_2"; Expr.true_
         | left ->
             if not @@ Expr.is_boolean_expr left then (
-              check_reduction 089_3; BinOp (left, Impl, f right))
+              check_reduction "089_3"; BinOp (left, Impl, f right))
             else (
-              check_reduction 089_4;
+              check_reduction "089_4";
               let pfs_with_left = PFS.copy pfs in
               PFS.extend pfs_with_left left;
               let right =
@@ -2138,12 +2040,12 @@ and reduce_lexpr_loop
               BinOp (left, Impl, right)))
     (* BinOps: List indexing *)
     | BinOp (le, LstNth, idx) -> (
-        check_reduction 090;
+        check_reduction "090";
         let fle = f le in
         let fidx = f idx in
         match fidx with
         | Lit (Int n) when Z.leq Z.zero n ->
-            check_reduction 090_1;
+            check_reduction "090_1";
             if lexpr_is_list gamma fle then
               Option.value
                 ~default:(Expr.BinOp (fle, LstNth, fidx))
@@ -2156,31 +2058,31 @@ and reduce_lexpr_loop
               L.normal (fun fmt -> fmt "%s" err_msg);
               raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
         | Lit (Int _) | Lit (Num _) ->
-            check_reduction 090_2;
+            check_reduction "090_2";
             let err_msg =
               "LstNth(list, index): index is smaller than zero or a float."
             in
             raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
-        | _ -> check_reduction 090_3; BinOp (fle, LstNth, fidx))
-    | BinOp (x, LstRepeat, Lit (Int i)) when Z.lt i (Z.of_int 100) -> check_reduction 091;
+        | _ -> check_reduction "090_3"; BinOp (fle, LstNth, fidx))
+    | BinOp (x, LstRepeat, Lit (Int i)) when Z.lt i (Z.of_int 100) -> check_reduction "091";
         let fx = f x in
         let result = List.init (Z.to_int i) (fun _ -> fx) in
         EList result
     (* BinOps: String indexing *)
     | BinOp (le, StrNth, idx) -> (
-        check_reduction 092;
+        check_reduction "092";
         let fle = f le in
         let fidx = f idx in
         match fidx with
         | Lit (Num n) when Arith_utils.is_int n && 0. <= n -> (
             match lexpr_is_string gamma fle with
             | true ->
-                check_reduction 092_1;
+                check_reduction "092_1";
                 Option.value
                   ~default:(Expr.BinOp (fle, StrNth, fidx))
                   (get_nth_of_string fle (int_of_float n))
             | false ->
-                check_reduction 092_2;
+                check_reduction "092_2";
                 let err_msg =
                   "StrNth(str, index): string is not a GIL string."
                 in
@@ -2188,41 +2090,41 @@ and reduce_lexpr_loop
                   (ReductionException (Expr.BinOp (fle, StrNth, fidx), err_msg))
             )
         | Lit (Num _) ->
-            check_reduction 092_3;
+            check_reduction "092_3";
             let err_msg =
               "StrNth(str, index): index is non-integer or smaller than zero."
             in
             raise (ReductionException (Expr.BinOp (fle, StrNth, fidx), err_msg))
-        | _ -> check_reduction 092_4; BinOp (fle, StrNth, fidx))
+        | _ -> check_reduction "092_4"; BinOp (fle, StrNth, fidx))
     (* BinOps: Maths *)
     | BinOp (Lit (Int z), ILessThanEqual, UnOp (LstLen, _))
-      when Z.equal z Z.zero -> check_reduction 093; Expr.true_
+      when Z.equal z Z.zero -> check_reduction "093"; Expr.true_
     (* x < y /\ (y <= x \/ y < x) <=> false *)
     | BinOp (e1, FLessThan, e2)
       when PFS.mem pfs (BinOp (e2, FLessThanEqual, e1))
-           || PFS.mem pfs (BinOp (e2, FLessThan, e1)) -> check_reduction 094; Expr.false_
+           || PFS.mem pfs (BinOp (e2, FLessThan, e1)) -> check_reduction "094"; Expr.false_
     | BinOp (e1, ILessThan, e2)
       when PFS.mem pfs (BinOp (e2, ILessThanEqual, e1))
-           || PFS.mem pfs (BinOp (e2, ILessThan, e1)) -> check_reduction 095; Expr.false_
+           || PFS.mem pfs (BinOp (e2, ILessThan, e1)) -> check_reduction "095"; Expr.false_
     (* x <= y /\ y < x <=> false *)
     | BinOp (e1, FLessThanEqual, e2)
-      when PFS.mem pfs (BinOp (e2, FLessThan, e1)) -> check_reduction 096; Expr.false_
+      when PFS.mem pfs (BinOp (e2, FLessThan, e1)) -> check_reduction "096"; Expr.false_
     | BinOp (e1, ILessThanEqual, e2)
-      when PFS.mem pfs (BinOp (e2, ILessThan, e1)) -> check_reduction 097; Expr.false_
+      when PFS.mem pfs (BinOp (e2, ILessThan, e1)) -> check_reduction "097"; Expr.false_
     (* x <= y /\ x < y <=> true *)
     | BinOp (e1, FLessThanEqual, e2)
-      when PFS.mem pfs (BinOp (e1, FLessThan, e2)) -> check_reduction 098; Expr.true_
+      when PFS.mem pfs (BinOp (e1, FLessThan, e2)) -> check_reduction "098"; Expr.true_
     | BinOp (e1, ILessThanEqual, e2)
-      when PFS.mem pfs (BinOp (e1, ILessThan, e2)) -> check_reduction 099; Expr.true_
+      when PFS.mem pfs (BinOp (e1, ILessThan, e2)) -> check_reduction "099"; Expr.true_
     (* x <= y /\ y <= x <=> x = y *)
     | BinOp (e1, ((FLessThanEqual | ILessThanEqual) as op), e2)
-      when PFS.mem pfs (BinOp (e2, op, e1)) -> check_reduction 100; BinOp (e1, Equal, e2)
+      when PFS.mem pfs (BinOp (e2, op, e1)) -> check_reduction "100"; BinOp (e1, Equal, e2)
     (* BinOps: set operations *)
     | BinOp (_, SetMem, NOp ((SetUnion | SetInter), [])) ->
-        check_reduction 101;
+        check_reduction "101";
         Expr.false_
     | BinOp (leb, SetMem, NOp (((SetUnion | SetInter) as op), le :: lle)) ->
-        check_reduction 102;
+        check_reduction "102";
         let bop : BinOp.t = if op = SetUnion then Or else And in
         let rle = f le in
         let rleb = f leb in
@@ -2233,7 +2135,7 @@ and reduce_lexpr_loop
           (Expr.BinOp (rleb, SetMem, rle))
           lle
     | BinOp (leb, SetMem, BinOp (lel, SetDiff, ler)) ->
-        check_reduction 103;
+        check_reduction "103";
         let rleb = f leb in
         let rlel = f lel in
         let rler = f ler in
@@ -2242,21 +2144,21 @@ and reduce_lexpr_loop
             And,
             UnOp (Not, BinOp (rleb, SetMem, rler)) )
     | BinOp (leb, SetMem, ESet les) ->
-        check_reduction 104;
+        check_reduction "104";
         let rleb = f leb in
         let rles = List.map f les in
         let result = List.map (fun le -> Expr.BinOp (rleb, Equal, le)) rles in
         Expr.disjunct result
     (* CHECK: FTimes and Div are the same, how does the 'when' scope? *)
     | BinOp (lel, op, ler) -> (
-        check_reduction 105;
+        check_reduction "105";
         let open Syntaxes.Option in
         let flel, fler, exn =
           try (f lel, f ler, false) with
           | ReductionException _ when op = Or || op = And ->
-              check_reduction 105_1;
+              check_reduction "105_1";
               (Expr.false_, Expr.false_, true)
-          | exn -> check_reduction 105_2; raise exn
+          | exn -> check_reduction "105_2"; raise exn
         in
         let- () = if exn then Some Expr.false_ else None in
         let def = Expr.BinOp (flel, op, fler) in
@@ -2266,19 +2168,19 @@ and reduce_lexpr_loop
             L.normal (fun m ->
                   m "[DEBUG] Literal BinOp inputs: flel = %a ; fler = %a"
                     Expr.pp flel Expr.pp fler);
-              check_reduction 105_3;
+              check_reduction "105_3";
               try
                 let lit = CExprEval.evaluate_binop (CStore.init []) op ll lr in
                 Some (Expr.Lit lit)
               with
               | CExprEval.TypeError err_msg ->
-                  check_reduction 105_4;
+                  check_reduction "105_4";
                   raise (ReductionException (def, err_msg))
               | CExprEval.EvaluationError err_msg ->
-                  check_reduction 105_5;
+                  check_reduction "105_5";
                   raise (ReductionException (def, err_msg))
-              | e -> check_reduction 105_6; raise e)
-          | _ -> check_reduction 105_7; None
+              | e -> check_reduction "105_6"; raise e)
+          | _ -> check_reduction "105_7"; None
         in
         let- () =
           reduce_binop_inttonum_const matching reduce_lvars pfs gamma flel fler
@@ -2286,10 +2188,10 @@ and reduce_lexpr_loop
         in
         match op with
         | Equal when Expr.equal flel fler ->
-            check_reduction 105_8;
+            check_reduction "105_8";
             Expr.true_
         | Equal -> (
-            check_reduction 105_9;
+            check_reduction "105_9";
             (* TODO: Here we don't use the 2nd param, is that ok? *)
             let t1, _ = Typing.type_lexpr gamma flel in
             let t2, _ = Typing.type_lexpr gamma fler in
@@ -2297,108 +2199,108 @@ and reduce_lexpr_loop
             let- () =
               match (t1, t2) with
               | Some t1, Some t2 when t1 <> t2 ->
-                  check_reduction 105_9_1; Some Expr.false_
-              | _, _ -> check_reduction 105_9_2; None
+                  check_reduction "105_9_1"; Some Expr.false_
+              | _, _ -> check_reduction "105_9_2"; None
             in
             match (flel, fler) with
             | EList [], x | x, EList [] | Lit (LList []), x | x, Lit (LList [])
               -> (
-                check_reduction 105_9_3;
+                check_reduction "105_9_3";
                 match x with
                 | Lit (LList (_ :: _)) | EList (_ :: _) ->
-                    check_reduction 105_9_3_1; Expr.false_
+                    check_reduction "105_9_3_1"; Expr.false_
                 | NOp (LstCat, les)
                   when List.exists
                          (function
                            | Expr.EList (_ :: _) | Lit (LList (_ :: _)) -> true
                            | _ -> false)
                          les ->
-                    check_reduction 105_9_3_2; Expr.false_
-                | _ -> check_reduction 105_9_3_3; def)
+                    check_reduction "105_9_3_2"; Expr.false_
+                | _ -> check_reduction "105_9_3_3"; def)
             | Lit (Bool true), LVar _ | LVar _, Lit (Bool true) ->
-                check_reduction 105_9_4;
+                check_reduction "105_9_4";
                 BinOp (flel, Equal, fler)
             | Lit (Bool true), _ when t2 = Some Type.BooleanType ->
-                check_reduction 105_9_5; fler
+                check_reduction "105_9_5"; fler
             | _, Lit (Bool true) when t1 = Some Type.BooleanType ->
-                check_reduction 105_9_6; flel
+                check_reduction "105_9_6"; flel
             | Lit (Bool b), (BinOp (_, Equal, _) as e)
             | (BinOp (_, Equal, _) as e), Lit (Bool b)
             | Lit (Bool b), UnOp (Not, (BinOp (_, Equal, _) as e))
             | UnOp (Not, (BinOp (_, Equal, _) as e)), Lit (Bool b) ->
-                check_reduction 105_9_7;
+                check_reduction "105_9_7";
                 if b then e else UnOp (Not, e)
             | _, _
               when (match (flel, fler) with
                    | LVar _, _ | _, LVar _ -> false
                    | _ -> true)
                    && is_type Type.ListType t1 && is_type Type.ListType t2 -> (
-                check_reduction 105_9_8;
+                check_reduction "105_9_8";
                 let htl1, htl2 =
                   ( get_head_and_tail_of_list ~pfs flel,
                     get_head_and_tail_of_list ~pfs fler )
                 in
                 match (htl1, htl2, flel, fler) with
                 | Some (hl1, tl1), Some (hl2, tl2), _, _ ->
-                    check_reduction 105_9_8_1;
+                    check_reduction "105_9_8_1";
                     BinOp (BinOp (hl1, Equal, hl2), And, BinOp (tl1, Equal, tl2))
                 | None, Some _, (Lit (LList _) | EList _), _ ->
-                    check_reduction 105_9_8_2; Expr.false_
+                    check_reduction "105_9_8_2"; Expr.false_
                 | Some _, None, _, (Lit (LList _) | EList _) ->
-                    check_reduction 105_9_8_3; Expr.false_
-                | _ -> check_reduction 105_9_8_4; def)
+                    check_reduction "105_9_8_3"; Expr.false_
+                | _ -> check_reduction "105_9_8_4"; def)
             | _, _ when is_type Type.NumberType t1 && is_type Type.NumberType t2 ->
-                check_reduction 105_9_9;
+                check_reduction "105_9_9";
                 let success, le1', le2' = Cnum.cut flel fler in
                 if success then BinOp (le1', Equal, le2') else def
             | le1, le2 when is_type Type.IntType t1 && is_type Type.IntType t2 ->
-                check_reduction 105_9_10;
+                check_reduction "105_9_10";
                 let success, le1', le2' = Cint.cut le1 le2 in
                 if success then BinOp (le1', Equal, le2') else def
-            | _, _ -> check_reduction 105_9_11; def)
+            | _, _ -> check_reduction "105_9_11"; def)
         | (FPlus | FMinus) when lexpr_is_number ~gamma def ->
-            check_reduction 105_10;
+            check_reduction "105_10";
             simplify_num_arithmetic_lexpr pfs gamma def
         | (IPlus | IMinus) when lexpr_is_int ~gamma def ->
-            check_reduction 105_11;
+            check_reduction "105_11";
             simplify_int_arithmetic_lexpr pfs gamma def
         | FTimes when lexpr_is_number ~gamma def -> (
-            check_reduction 105_12;
+            check_reduction "105_12";
             match (flel, fler) with
-            | Lit (Num 1.), x | x, Lit (Num 1.) -> check_reduction 105_12_1; x
-            | Lit (Num x), _ when x == nan -> check_reduction 105_12_2; Lit (Num nan)
-            | _, Lit (Num x) when x == nan -> check_reduction 105_12_3; Lit (Num nan)
+            | Lit (Num 1.), x | x, Lit (Num 1.) -> check_reduction "105_12_1"; x
+            | Lit (Num x), _ when x == nan -> check_reduction "105_12_2"; Lit (Num nan)
+            | _, Lit (Num x) when x == nan -> check_reduction "105_12_3"; Lit (Num nan)
             | BinOp (Lit (Num x), FTimes, y), Lit (Num z)
             | Lit (Num z), BinOp (Lit (Num x), FTimes, y) ->
-                check_reduction 105_12_4; BinOp (Lit (Num (z *. x)), FTimes, y)
-            | _, _ -> check_reduction 105_12_5; def)
+                check_reduction "105_12_4"; BinOp (Lit (Num (z *. x)), FTimes, y)
+            | _, _ -> check_reduction "105_12_5"; def)
         | ITimes when lexpr_is_int ~gamma def -> (
-            check_reduction 105_13;
+            check_reduction "105_13";
             match (flel, fler) with
-            | Lit (Int z), x when Z.equal z Z.one -> check_reduction 105_13_1; x
-            | x, Lit (Int z) when Z.equal z Z.one -> check_reduction 105_13_2; x
-            | (Lit (Int z) as zero), _ when Z.equal z Z.zero -> check_reduction 105_13_3; zero
-            | _, (Lit (Int z) as zero) when Z.equal z Z.zero -> check_reduction 105_13_4; zero
+            | Lit (Int z), x when Z.equal z Z.one -> check_reduction "105_13_1"; x
+            | x, Lit (Int z) when Z.equal z Z.one -> check_reduction "105_13_2"; x
+            | (Lit (Int z) as zero), _ when Z.equal z Z.zero -> check_reduction "105_13_3"; zero
+            | _, (Lit (Int z) as zero) when Z.equal z Z.zero -> check_reduction "105_13_4"; zero
             | BinOp (Lit (Int x), ITimes, y), Lit (Int z)
             | Lit (Int z), BinOp (Lit (Int x), ITimes, y) ->
-                check_reduction 105_13_5; BinOp (Lit (Int (Z.mul z x)), ITimes, y)
-            | _, _ -> check_reduction 105_13_6; def)
+                check_reduction "105_13_5"; BinOp (Lit (Int (Z.mul z x)), ITimes, y)
+            | _, _ -> check_reduction "105_13_6"; def)
         | FDiv when lexpr_is_number ~gamma def -> (
-            check_reduction 105_14;
+            check_reduction "105_14";
             match (flel, fler) with
-            | x, Lit (Num 1.) -> check_reduction 105_14_1; x
-            | _, _ -> check_reduction 105_14_2; def)
+            | x, Lit (Num 1.) -> check_reduction "105_14_1"; x
+            | _, _ -> check_reduction "105_14_2"; def)
         | IDiv when lexpr_is_int ~gamma def -> (
-            check_reduction 105_15;
+            check_reduction "105_15";
             match (flel, fler) with
-            | x, Lit (Int o) when Z.equal o Z.one -> check_reduction 105_15_1; x
-            | _, _ -> check_reduction 105_15_2; def)
+            | x, Lit (Int o) when Z.equal o Z.one -> check_reduction "105_15_1"; x
+            | _, _ -> check_reduction "105_15_2"; def)
         | And when lexpr_is_bool gamma def -> (
-            check_reduction 105_16;
+            check_reduction "105_16";
             match (flel, fler) with
-            | Lit (Bool true), x | x, Lit (Bool true) -> check_reduction 105_16_1; x
-            | Lit (Bool false), _ | _, Lit (Bool false) -> check_reduction 105_16_2; Lit (Bool false)
-            | _, _ -> check_reduction 105_16_3;
+            | Lit (Bool true), x | x, Lit (Bool true) -> check_reduction "105_16_1"; x
+            | Lit (Bool false), _ | _, Lit (Bool false) -> check_reduction "105_16_2"; Lit (Bool false)
+            | _, _ -> check_reduction "105_16_3";
                 if
                   (PFS.mem pfs @@ Expr.negate flel)
                   || (PFS.mem pfs @@ Expr.negate fler)
@@ -2407,11 +2309,11 @@ and reduce_lexpr_loop
                 else if PFS.mem pfs fler then (flel)
                 else (BinOp (flel, And, fler)))
         | Or when lexpr_is_bool gamma def -> (
-            check_reduction 105_17;
+            check_reduction "105_17";
             match (flel, fler) with
-            | Lit (Bool true), _ | _, Lit (Bool true) -> check_reduction 105_17_1; Lit (Bool true)
-            | Lit (Bool false), x | x, Lit (Bool false) -> check_reduction 105_17_2; x
-            | _, _ -> check_reduction 105_17_3;
+            | Lit (Bool true), _ | _, Lit (Bool true) -> check_reduction "105_17_1"; Lit (Bool true)
+            | Lit (Bool false), x | x, Lit (Bool false) -> check_reduction "105_17_2"; x
+            | _, _ -> check_reduction "105_17_3";
                 if PFS.mem pfs flel || PFS.mem pfs fler then
                   (Lit (Bool true))
                 else if PFS.mem pfs @@ Expr.negate flel then
@@ -2420,33 +2322,33 @@ and reduce_lexpr_loop
                   (flel)
                 else (BinOp (flel, Or, fler)))
         | StrCat when lexpr_is_string gamma def -> (
-            check_reduction 105_18;
+            check_reduction "105_18";
             match (flel, fler) with
-            | x, Lit (String "") | Lit (String ""), x -> check_reduction 105_18_1; x
+            | x, Lit (String "") | Lit (String ""), x -> check_reduction "105_18_1"; x
             | BinOp (el, StrCat, Lit (String s1)), Lit (String s2) ->
-                check_reduction 105_18_2; BinOp (el, StrCat, Lit (String (s1 ^ s2)))
-            | _, _ -> check_reduction 105_18_3; def)
+                check_reduction "105_18_2"; BinOp (el, StrCat, Lit (String (s1 ^ s2)))
+            | _, _ -> check_reduction "105_18_3"; def)
         | SetDiff when lexpr_is_set gamma def -> (
-            check_reduction 105_19;
+            check_reduction "105_19";
             let pfs = PFS.to_list pfs in
             if contained_in_union pfs flel fler then
               (ESet [])
             else
               match (flel, fler) with
-              | x, y when x = y -> check_reduction 105_19_1; ESet []
-              | ESet [], _ -> check_reduction 105_19_2; ESet []
-              | x, ESet [] -> check_reduction 105_19_3; x
+              | x, y when x = y -> check_reduction "105_19_1"; ESet []
+              | ESet [], _ -> check_reduction "105_19_2"; ESet []
+              | x, ESet [] -> check_reduction "105_19_3"; x
               | ESet left, ESet right
                 when Expr.all_literals left && Expr.all_literals right ->
-                  check_reduction 105_19_4;
+                  check_reduction "105_19_4";
                   ESet Expr.Set.(elements (diff (of_list left) (of_list right)))
               | ESet left, s when Expr.all_literals left ->
-                  check_reduction 105_19_5;
+                  check_reduction "105_19_5";
                   if List.for_all (fun x -> set_member pfs x s) left then
                     ESet []
                   else def
               | ESet left, ESet right ->
-                  check_reduction 105_19_6;
+                  check_reduction "105_19_6";
                   let candidate_result =
                     Expr.Set.(elements (diff (of_list left) (of_list right)))
                   in
@@ -2460,91 +2362,91 @@ and reduce_lexpr_loop
                   in
                   result
               | NOp (SetUnion, les), _ ->
-                  check_reduction 105_19_7;
+                  check_reduction "105_19_7";
                   let diffs =
                     List.map (fun le -> f (BinOp (le, SetDiff, fler))) les
                   in
                   NOp (SetUnion, diffs)
               | _, NOp (SetUnion, les) ->
-                  check_reduction 105_19_8;
+                  check_reduction "105_19_8";
                   NOp
                     ( SetInter,
                       List.map (fun le -> Expr.BinOp (flel, SetDiff, le)) les )
               | x, ESet [ el ]
                 when List.mem (Expr.UnOp (Not, BinOp (el, SetMem, x))) pfs ->
-                  check_reduction 105_19_9; x
+                  check_reduction "105_19_9"; x
               | LVar _, _ ->
-                  check_reduction 105_19_10;
+                  check_reduction "105_19_10";
                   if set_subset pfs flel fler then ESet [] else def
               | ESet les, fler when all_different pfs les ->
-                  check_reduction 105_19_11;
+                  check_reduction "105_19_11";
                   let _, rest =
                     List.partition (fun x -> set_member pfs x fler) les
                   in
                   if List.for_all (fun x -> not_set_member pfs x fler) rest then
                     ESet rest
                   else BinOp (ESet rest, SetDiff, fler)
-              | _, _ -> check_reduction 105_19_12; def)
+              | _, _ -> check_reduction "105_19_12"; def)
         (* let hM = f (BinOp (flel, SetSub, fler)) in
            (match hM with
            | Lit (Bool true) -> ESet []
            | _ -> def)) *)
         | SetMem when lexpr_is_bool gamma def -> (
-            check_reduction 105_20;
+            check_reduction "105_20";
             match (flel, fler) with
-            | _, ESet [] -> check_reduction 105_20_1; Lit (Bool false)
-            | _, ESet [ x ] -> check_reduction 105_20_2; BinOp (flel, Equal, x)
-            | le, ESet les -> check_reduction 105_20_3; (
+            | _, ESet [] -> check_reduction "105_20_1"; Lit (Bool false)
+            | _, ESet [ x ] -> check_reduction "105_20_2"; BinOp (flel, Equal, x)
+            | le, ESet les -> check_reduction "105_20_3"; (
                 match List.mem le les with
-                | true -> check_reduction 105_20_4; Lit (Bool true)
-                | false -> check_reduction 105_20_5; (
+                | true -> check_reduction "105_20_4"; Lit (Bool true)
+                | false -> check_reduction "105_20_5"; (
                     match le with
-                    | Lit _ -> check_reduction 105_20_5_1;
+                    | Lit _ -> check_reduction "105_20_5_1";
                         if Expr.all_literals les then
                           (Lit (Bool false))
                         else (def)
-                    | _ -> check_reduction 105_20_5_2; def))
-            | _, _ -> check_reduction 105_20_6; def)
+                    | _ -> check_reduction "105_20_5_2"; def))
+            | _, _ -> check_reduction "105_20_6"; def)
         | SetSub when lexpr_is_bool gamma def -> (
-            check_reduction 105_21;
+            check_reduction "105_21";
             match (flel, fler) with
-            | ESet [], _ -> check_reduction 105_21_1; Lit (Bool true)
-            | _, ESet [] -> check_reduction 105_21_2; Lit (Bool false)
+            | ESet [], _ -> check_reduction "105_21_1"; Lit (Bool true)
+            | _, ESet [] -> check_reduction "105_21_2"; Lit (Bool false)
             | ESet left, ESet right
               when Expr.all_literals left && Expr.all_literals right ->
-                check_reduction 105_21_3;
+                check_reduction "105_21_3";
                 Lit
                   (Bool
                      (Expr.Set.subset (Expr.Set.of_list left)
                         (Expr.Set.of_list right)))
             | LVar _, NOp (SetUnion, les) ->
-                check_reduction 105_21_4;
+                check_reduction "105_21_4";
                 if List.mem flel les then Lit (Bool true) else def
-            | _, _ -> check_reduction 105_21_5; def)
+            | _, _ -> check_reduction "105_21_5"; def)
         | FLessThan ->
-            check_reduction 105_22;
+            check_reduction "105_22";
             let success, el, er = Cnum.cut flel fler in
             if success then Expr.BinOp (el, FLessThan, er) else def
         | ILessThan -> (
-            check_reduction 105_23;
+            check_reduction "105_23";
             match (flel, fler) with
             | x, fler
               when let fler_len = substitute_for_list_length pfs fler in
                    match fler_len with
-                   | UnOp (LstLen, _) -> check_reduction 105_23_1; true
+                   | UnOp (LstLen, _) -> check_reduction "105_23_1"; true
                    | _ -> false ->
-                check_reduction 105_23_2;
+                check_reduction "105_23_2";
                 BinOp (BinOp (x, IPlus, Lit (Int Z.one)), ILessThanEqual, fler)
             | UnOp (LstLen, _), Lit (Int n) when Z.leq n Z.zero ->
-                check_reduction 105_23_3; Lit (Bool false)
+                check_reduction "105_23_3"; Lit (Bool false)
             | UnOp (LstLen, le), Lit (Int z) when Z.equal z Z.one ->
-                check_reduction 105_23_4; BinOp (le, Equal, EList [])
+                check_reduction "105_23_4"; BinOp (le, Equal, EList [])
             | _ ->
-                check_reduction 105_23_5;
+                check_reduction "105_23_5";
                 let success, el, er = Cint.cut flel fler in
                 if success then Expr.BinOp (el, ILessThan, er) else def)
         | FLessThanEqual -> (
-            check_reduction 105_24;
+            check_reduction "105_24";
             let success, el, er = Cnum.cut flel fler in
             if success then (BinOp (el, FLessThanEqual, er))
             else
@@ -2552,10 +2454,10 @@ and reduce_lexpr_loop
                 check_ge_zero_num ~top_level:true pfs
                   (f (BinOp (fler, FMinus, flel)))
               with
-              | Some x -> check_reduction 105_24_1; Lit (Bool x)
-              | None -> check_reduction 105_24_2; def)
+              | Some x -> check_reduction "105_24_1"; Lit (Bool x)
+              | None -> check_reduction "105_24_2"; def)
         | ILessThanEqual -> (
-            check_reduction 105_25;
+            check_reduction "105_25";
             let success, el, er = Cint.cut flel fler in
             if success then (BinOp (el, ILessThanEqual, er))
             else
@@ -2563,9 +2465,9 @@ and reduce_lexpr_loop
                 check_ge_zero_int ~top_level:true pfs
                   (f (BinOp (fler, IMinus, flel)))
               with
-              | Some x -> check_reduction 105_25_1; Lit (Bool x)
-              | None -> check_reduction 105_25_2; def)
-        | _ -> check_reduction 105_26; def)
+              | Some x -> check_reduction "105_25_1"; Lit (Bool x)
+              | None -> check_reduction "105_25_2"; def)
+        | _ -> check_reduction "105_26"; def)
     with ReductionDisabled  -> le
   in
   let result = normalise_list_expressions result in
@@ -2594,26 +2496,26 @@ and simplify_num_arithmetic_lexpr
     (le : Expr.t) =
   let f = reduce_lexpr_loop pfs gamma in
   match le with
-  | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> check_reduction 310; l
+  | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> check_reduction "310"; l
   (* Binary minus to unary minus *)
-  | BinOp (l, FMinus, r) -> check_reduction 311; f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
+  | BinOp (l, FMinus, r) -> check_reduction "311"; f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
   (* Unary minus distributes over +, - *)
-  | UnOp (FUnaryMinus, e) -> check_reduction 312; (
+  | UnOp (FUnaryMinus, e) -> check_reduction "312"; (
       match e with
-      | BinOp (l, FPlus, r) -> check_reduction 312_1;
+      | BinOp (l, FPlus, r) -> check_reduction "312_1";
           f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))
-      | BinOp (l, FMinus, r) -> check_reduction 312_2; f (BinOp (UnOp (FUnaryMinus, l), FPlus, r))
-      | _ -> check_reduction 312_3; le)
+      | BinOp (l, FMinus, r) -> check_reduction "312_2"; f (BinOp (UnOp (FUnaryMinus, l), FPlus, r))
+      | _ -> check_reduction "312_3"; le)
   (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, FPlus, r) ->
-      check_reduction 313;
+      check_reduction "313";
       let cl = Cnum.of_expr l in
       let cr = Cnum.of_expr r in
       L.verbose (fun fmt ->
           fmt "FPlus check:\n\t%a\t-->\t%a\n\t%a\t-->\t%a" Expr.pp l Expr.pp
             (Cnum.to_expr cl) Expr.pp r Expr.pp (Cnum.to_expr cr));
       Cnum.to_expr (Cnum.plus cl cr)
-  | _ -> check_reduction 314; le
+  | _ -> check_reduction "314"; le
 
 and simplify_int_arithmetic_lexpr
     (pfs : PFS.t)
@@ -2621,21 +2523,21 @@ and simplify_int_arithmetic_lexpr
     (le : Expr.t) =
   let f = reduce_lexpr_loop pfs gamma in
   match le with
-  | BinOp (l, IPlus, Lit (Int z)) when Z.equal z Z.zero -> check_reduction 210; l
-  | BinOp (Lit (Int z), IPlus, l) when Z.equal z Z.zero -> check_reduction 211; l
+  | BinOp (l, IPlus, Lit (Int z)) when Z.equal z Z.zero -> check_reduction "210"; l
+  | BinOp (Lit (Int z), IPlus, l) when Z.equal z Z.zero -> check_reduction "211"; l
   (* Binary minus to unary minus *)
   (* Opale: how is this any better? *)
-  | BinOp (l, IMinus, r) -> check_reduction 212; f (BinOp (l, IPlus, UnOp (IUnaryMinus, r)))
+  | BinOp (l, IMinus, r) -> check_reduction "212"; f (BinOp (l, IPlus, UnOp (IUnaryMinus, r)))
   (* Unary minus distributes over + *)
   | UnOp (IUnaryMinus, BinOp (l, IPlus, r)) ->
-      check_reduction 213; f (BinOp (UnOp (IUnaryMinus, l), IPlus, UnOp (IUnaryMinus, r)))
+      check_reduction "213"; f (BinOp (UnOp (IUnaryMinus, l), IPlus, UnOp (IUnaryMinus, r)))
   (* IPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, IPlus, r) ->
-      check_reduction 214;
+      check_reduction "214";
       let cl = Cint.of_expr l in
       let cr = Cint.of_expr r in
       Cint.to_expr (Cint.plus cl cr)
-  | _ -> check_reduction 215; le
+  | _ -> check_reduction "215"; le
 
 (** Checks if an int expression is greater than zero.
 
@@ -2870,10 +2772,10 @@ and substitute_for_specific_length
   in
   let results = List.sort_uniq Stdlib.compare results in
   match results with
-  | [] -> check_reduction 500; le
-  | [ result ] -> check_reduction 501; result
+  | [] -> check_reduction "500"; le
+  | [ result ] -> check_reduction "501"; result
   | oops ->
-      check_reduction 502;
+      check_reduction "502";
       L.verbose (fun fmt ->
           fmt "Multiple results... %a" Fmt.(list ~sep:comma Expr.pp) oops);
       le

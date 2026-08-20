@@ -361,7 +361,7 @@ let simplify_pfs_and_gamma
       (* Unit types *)
       let simplify_unit_types () =
         try
-          Reduction.check_reduction 600;
+          Reduction.check_reduction "600";
           Type_env.iter gamma (fun x t ->
               let e = Expr.from_var_name x in
               match t with
@@ -406,7 +406,7 @@ let simplify_pfs_and_gamma
             `Replace whole
         (* And is expanded *)
         | BinOp (a1, And, a2) ->
-            Reduction.check_reduction 601;
+            Reduction.check_reduction "601";
             extend_with a2;
             rec_call a1
         (* If we find true, we can delete it *)
@@ -419,7 +419,7 @@ let simplify_pfs_and_gamma
             let te2, _ = Typing.type_lexpr gamma le2 in
             match (te1, te2) with
             | Some te1, Some te2 when te1 <> te2 ->
-                Reduction.check_reduction 602;
+                Reduction.check_reduction "602";
                 `Filter
             | Some te1, Some te2
               when te1 = te2
@@ -431,7 +431,7 @@ let simplify_pfs_and_gamma
         | BinOp (elem, Equal, BinOp (lst, LstNth, idx)) -> (
             match idx with
             | Lit (Int nx) ->
-                Reduction.check_reduction 604;
+                Reduction.check_reduction "604";
                 let prepend_lvars =
                   List.init (Z.to_int nx) (fun _ -> LVar.alloc ())
                 in
@@ -452,15 +452,15 @@ let simplify_pfs_and_gamma
             | Lit (Num _) -> failwith "l-nth(l, f) where f is Num and not Int!"
             | _ -> `Replace whole)
         | BinOp (UnOp (LstLen, le), Equal, Lit (Int z)) when Z.equal z Z.zero ->
-            Reduction.check_reduction 605;
+            Reduction.check_reduction "605";
             rec_call (BinOp (le, Equal, EList []))
         | BinOp (Lit (Int z), Equal, UnOp (LstLen, le)) when Z.equal z Z.zero ->
-            Reduction.check_reduction 605;
+            Reduction.check_reduction "605";
             rec_call (BinOp (le, Equal, EList []))
         | BinOp (UnOp (LstLen, le), Equal, Lit (Int len))
         | BinOp (Lit (Int len), Equal, UnOp (LstLen, le))
           when (not matching) && Z.leq len (Z.of_int 100) ->
-            Reduction.check_reduction 606;
+            Reduction.check_reduction "606";
             let len = Z.to_int len in
             if len >= 0 then (
               let le_vars = List.init len (fun _ -> LVar.alloc ()) in
@@ -472,7 +472,7 @@ let simplify_pfs_and_gamma
         | BinOp (NOp (LstCat, les), Equal, Lit (LList []))
         | BinOp (EList [], Equal, NOp (LstCat, les))
         | BinOp (Lit (LList []), Equal, NOp (LstCat, les)) ->
-            Reduction.check_reduction 607;
+            Reduction.check_reduction "607";
             let eqs =
               List.map (fun le -> Expr.BinOp (le, Equal, EList [])) les
             in
@@ -480,7 +480,7 @@ let simplify_pfs_and_gamma
             `Filter
         (* Two list concats, Satan save us *)
         | BinOp (NOp (LstCat, lcat), Equal, NOp (LstCat, rcat)) -> (
-            Reduction.check_reduction 608;
+            Reduction.check_reduction "608";
             match Reduction.understand_lstcat lpfs gamma lcat rcat with
             | None -> `Replace whole
             | Some (pf, new_vars) ->
@@ -490,7 +490,7 @@ let simplify_pfs_and_gamma
         (* *)
         | BinOp (UnOp (LstLen, x), Equal, BinOp (Lit (Int n), IPlus, LVar z))
           when Z.geq n Z.zero ->
-            Reduction.check_reduction 609;
+            Reduction.check_reduction "609";
             let new_lvars =
               List.init (Z.to_int n) (fun _ -> Expr.LVar (LVar.alloc ()))
             in
@@ -506,7 +506,7 @@ let simplify_pfs_and_gamma
         (* Sublist *)
         | BinOp (LstSub (lst, start, num), Equal, sl)
         | BinOp (sl, Equal, LstSub (lst, start, num)) ->
-            Reduction.check_reduction 610;
+            Reduction.check_reduction "610";
             let prefix_lvar = LVar.alloc () in
             let suffix_lvar = LVar.alloc () in
             vars_to_kill :=
@@ -550,7 +550,7 @@ let simplify_pfs_and_gamma
             | _, _ -> (
                 match (le1, le2) with
                 | UnOp (LstLen, LVar x), UnOp (LstLen, LVar y) when x <> y ->
-                    Reduction.check_reduction 612;
+                    Reduction.check_reduction "612";
                     let x, y =
                       match
                         (Names.is_spec_var_name x, Names.is_spec_var_name y)
@@ -572,7 +572,7 @@ let simplify_pfs_and_gamma
                        let temp_subst = SESubst.init [ aloc, Lit (Loc lloc) ] in
                          PFS.substitution_in_place temp_subst lpfs *)
                 | ALoc alocl, ALoc alocr when matching ->
-                    Reduction.check_reduction 613;
+                    Reduction.check_reduction "613";
                     L.verbose (fun fmt ->
                         fmt "Two equal alocs: %s and %s" alocl alocr);
                     SESubst.put result (ALoc alocr) (ALoc alocl);
@@ -593,7 +593,7 @@ let simplify_pfs_and_gamma
                 | LVar v1, LVar v2 when v1 = v2 -> `Filter
                 (* Variable and something else *)
                 | LVar v, le | le, LVar v -> (
-                    Reduction.check_reduction 614;
+                    Reduction.check_reduction "614";
                     (* Understand, if there are two lvars, which should be substituted *)
                     let v, (le : Expr.t) =
                       match le with
@@ -697,7 +697,7 @@ let simplify_pfs_and_gamma
                         | Ok () -> `Filter))
                 | UnOp (TypeOf, LVar v), Lit (Type t)
                 | Lit (Type t), UnOp (TypeOf, LVar v) -> (
-                    Reduction.check_reduction 615;
+                    Reduction.check_reduction "615";
                     match Type_env.get gamma v with
                     | None ->
                         Type_env.update gamma v t;
@@ -732,7 +732,7 @@ let simplify_pfs_and_gamma
 
       let analyse_list_structure pfs =
         try
-          Reduction.check_reduction 617;
+          Reduction.check_reduction "617";
           L.verbose (fun fmt -> fmt "Analysing list structure.");
         let map_add k v map =
           match Expr.Map.mem k map with
@@ -937,7 +937,7 @@ let simplify_pfs_and_gamma
               match t with
               | Type.ListType -> (
                   try
-                    Reduction.check_reduction 620;
+                    Reduction.check_reduction "620";
                     PFS.extend lpfs
                       (BinOp
                          ( Expr.zero_i,
@@ -1008,7 +1008,7 @@ let simplify_implication
       match pf with
       | BinOp (NOp (LstCat, lex), Equal, NOp (LstCat, ley)) -> (
           try
-            Reduction.check_reduction 621;
+            Reduction.check_reduction "621";
             let flen_eq =
               Reduction.reduce_lexpr ~gamma ~pfs:lpfs
                 (BinOp

@@ -11,7 +11,7 @@ exception ReductionDisabled
     has fired (emitting a [REDUCE_...] log entry), or raises {!ReductionDisabled}
     if [n] is currently disabled. Used to instrument both [Reduction] and
     [Simplifications] so the benchmark harness can observe and toggle each rule. *)
-val check_reduction : int -> unit
+val check_reduction : string -> unit
 
 (** [resolve_to_location pfs e] attempts to resolve the expression denoted by
     [e] to a location given the pure formulae [pfs]. If successful, it returns

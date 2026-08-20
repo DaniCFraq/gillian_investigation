@@ -2,7 +2,7 @@
 
 A lookup table for every `check_reduction` tag that Gillian can emit, so a bare number from `file_simplification_results.csv` can be read as an actual simplification.
 
-Each tag is logged as `[REDUCE_<tag>]` when it fires and can be switched off with `disable_reductions [ <tag> ]`. Tags live in two files:
+Each tag is logged as `[REDUCE_<tag>]` when it fires and can be switched off with `disable_reductions [ "<tag>" ]`. Tags are stringsand live in two files:
 
 - **`Reduction.ml`** — expression-level reduction (`reduce_lexpr`).
 - **`Simplifications.ml`** — pure-formula-set simplification run before the SMT solver (600-series).
