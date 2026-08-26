@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
+"https://www.why3.org/why3session.dtd">
+<why3session shape_version="6">
+<prover id="0" name="CVC5" version="1.0.6" timelimit="5" steplimit="0" memlimit="1000"/>
+<prover id="1" name="Alt-Ergo" version="2.6.2" timelimit="5" steplimit="0" memlimit="1000"/>
+<prover id="2" name="Z3" version="4.15.2" timelimit="5" steplimit="0" memlimit="1000"/>
+<file format="ocaml" proved="true">
+<path name=".."/><path name="list_normaliser.ml"/>
+<theory name="List_normaliser" proved="true">
+ <goal name="nth_v&#39;vc" expl="VC for nth_v" proved="true">
+ <proof prover="2"><result status="valid" time="0.005062" steps="10120"/></proof>
+ </goal>
+ <goal name="eval&#39;vc" expl="VC for eval" proved="true">
+ <proof prover="1"><result status="valid" time="0.140111" steps="1053"/></proof>
+ </goal>
+ <goal name="eval_list&#39;vc" expl="VC for eval_list" proved="true">
+ <proof prover="0"><result status="valid" time="0.044066" steps="27614"/></proof>
+ </goal>
+ <goal name="eval_list_length" proved="true">
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="eval_list_length.0" proved="true">
+  <proof prover="1"><result status="valid" time="0.039965" steps="134"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="no_lit_list&#39;vc" expl="VC for no_lit_list" proved="true">
+ <proof prover="1"><result status="valid" time="0.134029" steps="1075"/></proof>
+ </goal>
+ <goal name="no_lit_list_list&#39;vc" expl="VC for no_lit_list_list" proved="true">
+ <proof prover="0"><result status="valid" time="0.042438" steps="29695"/></proof>
+ </goal>
+ <goal name="from_lit&#39;vc" expl="VC for from_lit" proved="true">
+ <proof prover="1"><result status="valid" time="0.089789" steps="903"/></proof>
+ </goal>
+ <goal name="map_lit&#39;vc" expl="VC for map_lit" proved="true">
+ <proof prover="1"><result status="valid" time="0.105958" steps="900"/></proof>
+ </goal>
+ <goal name="nth_e&#39;vc" expl="VC for nth_e" proved="true">
+ <proof prover="1"><result status="valid" time="0.079735" steps="639"/></proof>
+ </goal>
+ <goal name="nth_step_idx&#39;vc" expl="VC for nth_step_idx" proved="true">
+ <proof prover="1"><result status="valid" time="0.062105" steps="404"/></proof>
+ </goal>
+ <goal name="nth_step&#39;vc" expl="VC for nth_step" proved="true">
+ <proof prover="1"><result status="valid" time="0.052329" steps="310"/></proof>
+ </goal>
+ <goal name="len_step&#39;vc" expl="VC for len_step" proved="true">
+ <proof prover="1"><result status="valid" time="0.061389" steps="436"/></proof>
+ </goal>
+ <goal name="normalise&#39;vc" expl="VC for normalise" proved="true">
+ <proof prover="1"><result status="valid" time="0.324031" steps="3373"/></proof>
+ </goal>
+ <goal name="normalise_list&#39;vc" expl="VC for normalise_list" proved="true">
+ <proof prover="1"><result status="valid" time="0.085262" steps="772"/></proof>
+ </goal>
+</theory>
+</file>
+</why3session>
