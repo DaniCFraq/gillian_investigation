@@ -34,7 +34,7 @@ let[@logic] len_val (v : value) : value =
   | VList vs -> VInt (List.length vs)
   | _ -> VUndef
 
-let[@logic] plus_val (v1 : value) (v2 : value) : value =
+let plus_val (v1 : value) (v2 : value) : value =
   match (v1, v2) with
   | VInt a, VInt b -> VInt (a + b)
   | _ -> VUndef
@@ -62,7 +62,7 @@ and[@logic] eval_list (s : store) (es : expr list) : value list =
 
 
 (* The normal form the pass aims at: no literal list anywhere *)
-let[@logic] is_list_lit (v : value) : bool =
+let is_list_lit (v : value) : bool =
   match v with
   | VList _ -> true
   | _ -> false
@@ -86,7 +86,7 @@ and[@logic] no_lit_list_list (es : expr list) : bool =
       variant es *)
 
 
-(* Tags 401 and 402: Expr.from_lit_list *)
+(* Tags 401 and 402: Expr.from_lit_list - Lifting literal lists to lists of expression *)
 let[@logic] rec from_lit (v : value) : expr =
   match v with
   (* tag 401 *)
@@ -109,7 +109,10 @@ and[@logic] map_lit (vl : value list) : expr list =
       ensures forall s. eval_list s r = vl
       ensures no_lit_list_list r *)
 
-(* Tags 404_1 and 404_7: LstNth of an explicit list *)
+(* Tag 404_1: LstNth of an explicit list.  404_7 is its fall-back arm,
+   the one Gillian takes when no reduction applies and it rebuilds the
+   term as it was; it is here because the match has to be total, and
+   because 404_1 only says something once that alternative is pinned. *)
 let[@logic] rec nth_e (es : expr list) (n : int) : expr =
   match es with
   | [] -> Lit VUndef
@@ -127,7 +130,7 @@ let[@logic] nth_step_idx (l : expr list) (n2 : expr) : expr =
   | Lit (VInt n) ->
       (* tag 404_1 when the index is in range, 404_7 when it is not *)
       if 0 <= n && n < List.length l then nth_e l n else LstNth (EList l, n2)
-  (* tag 404_7 *)
+  (* tag 404_7: no reduction, rebuild the term *)
   | _ -> LstNth (EList l, n2)
 (*@ r = nth_step_idx l n2
       ensures forall s. eval s r = nth_val (VList (eval_list s l)) (eval s n2)
@@ -137,19 +140,19 @@ let[@logic] nth_step (n1 : expr) (n2 : expr) : expr =
   match n1 with
   (* tags 404_1, 404_7 *)
   | EList l -> nth_step_idx l n2
-  (* tag 404_7 *)
+  (* tag 404_7: no reduction, rebuild the term *)
   | _ -> LstNth (n1, n2)
 (*@ r = nth_step n1 n2
       ensures forall s. eval s r = nth_val (eval s n1) (eval s n2)
       ensures no_lit_list n1 -> no_lit_list n2 -> no_lit_list r *)
 
 
-(* Tags 408_1 and 408_3: LstLen of an explicit list *)
+(* Tag 408_1: LstLen of an explicit list, with fall-back arm 408_3. *)
 let[@logic] len_step (n1 : expr) : expr =
   match n1 with
   (* tag 408_1 *)
   | EList l -> Lit (VInt (List.length l))
-  (* tag 408_3 *)
+  (* tag 408_3: no reduction, rebuild the term *)
   | _ -> LstLen n1
 (*@ r = len_step n1
       ensures forall s. eval s r = len_val (eval s n1)
@@ -164,9 +167,9 @@ let[@logic] rec normalise (e : expr) : expr =
   | Var x -> Var x
   (* tag 411 *)
   | EList es -> EList (normalise_list es)
-  (* tags 404_1, 404_7 *)
+  (* tag 404_1, with fall-back 404_7 *)
   | LstNth (e1, e2) -> nth_step (normalise e1) (normalise e2)
-  (* tags 408_1, 408_3 *)
+  (* tag 408_1, with fall-back 408_3 *)
   | LstLen e1 -> len_step (normalise e1)
   (* tag 405 *)
   | Plus (e1, e2) -> Plus (normalise e1, normalise e2)
