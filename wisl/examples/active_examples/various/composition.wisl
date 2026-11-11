@@ -17,15 +17,15 @@ function alloc_cell(v) {
     [p] := v;
     return p
 }
-{ cell(ret; #v) }
+{ cell(ret, #v) }
 
 // Reads the value stored in a cell, leaving it intact
-{ (p == #p) * cell(#p; #v) }
+{ (p == #p) * cell(#p, #v) }
 function read_cell(p) {
     v := [p];
     return v
 }
-{ cell(#p; #v) * (ret == #v) }
+{ cell(#p, #v) * (ret == #v) }
 
 // Allocates two cells with values a and b, reads both, frees both,
 // and returns their sum.  The verifier composes the contracts of
