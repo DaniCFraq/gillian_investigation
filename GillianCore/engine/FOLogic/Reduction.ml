@@ -14,10 +14,29 @@ let log_reduction (n : string) = L.normal (fun m -> m "[REDUCE_%s]" n)
 (* normal *)
 let () = disable_reductions []
 
-exception ReductionDisabled 
+exception ReductionDisabled
+
+(* Optional in-memory firing counter: if GILLIAN_REDUCE_COUNTS=<path> is set,
+   count every fired tag and dump "tag<TAB>count" lines to <path> at exit
+   (also on SIGTERM). Unset = no overhead beyond one option check. *)
+let reduce_counts : (string, int) Hashtbl.t option =
+  match Sys.getenv_opt "GILLIAN_REDUCE_COUNTS" with
+  | None | Some "" -> None
+  | Some path ->
+      let tbl = Hashtbl.create 256 in
+      at_exit (fun () ->
+          let oc = open_out path in
+          Hashtbl.iter (fun k v -> Printf.fprintf oc "%s\t%d\n" k v) tbl;
+          close_out oc);
+      Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ -> exit 124));
+      Some tbl
 
 let check_reduction (n : string) =
   if List.mem n !disabled_reductions then raise ReductionDisabled;
+  (match reduce_counts with
+   | Some tbl ->
+       Hashtbl.replace tbl n (1 + Option.value ~default:0 (Hashtbl.find_opt tbl n))
+   | None -> ());
   log_reduction n
 module CStore = Store.Make (CVal.M)
 
