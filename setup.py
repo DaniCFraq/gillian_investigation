@@ -5,6 +5,7 @@ import csv
 import os
 import signal
 import argparse
+import time
 from pathlib import Path
 
 """
@@ -13,15 +14,20 @@ from pathlib import Path
     3º - Verificar quais simplificações podem ser desativadas. Para isso, corremos primeiro o programa sem alterações e guardamos o resultado (baseline): veredicto de cada spec, falhas reportadas e se o motor crashou. Depois corremos o programa com uma simplificação desativada de cada vez: se o resultado for igual ao baseline, a simplificação é opcional; se mudar (erro diferente, crash, timeout, ou uma falha que desaparece), é obrigatória. Isto permite analisar também exemplos que falham de propósito (memory errors), cujo baseline já é uma falha.
     4º - Para cada ficheiro .wisl encontrado recursivamente na pasta indicada, guarda o caminho, as simplificações obrigatórias e as opcionais num ficheiro CSV.
     5º - Se o ficheiro .wisl já existir no CSV, é ignorado (skip).
+
+    Timeout: cada teste compila primeiro (dune build, sem limite de tempo) e só depois corre o wisl já compilado (dune exec --no-build) com limite de tempo. Assim o limite mede apenas a verificação, não a recompilação. O limite é TIMEOUT_FACTOR vezes o tempo do baseline desse exemplo, com um mínimo de MIN_TIMEOUT segundos: serve para apanhar os casos em que o motor entra em ciclo com uma simplificação desligada.
 """
 
-compile_cmd: str = "dune build"
+# Só o executável do wisl: um "dune build" completo também corre testes que
+# executam o motor (ppx_sat/test) e falha com certas simplificações desligadas.
+compile_cmd: str = "dune build wisl/bin/wisl.exe"
 line_to_replace: str = "let () = disable_reductions []"
 reduction_file: str = "GillianCore/engine/FOLogic/Reduction.ml"
 output: str = "program_trace.txt"
 
 original_line: str = line_to_replace
-RUN_TIMEOUT = 25
+MIN_TIMEOUT = 25
+TIMEOUT_FACTOR = 10
 
 
 def _killpg(pgid: int):
@@ -56,7 +62,14 @@ def run_command(cmd: str, timeout: int | None = None, check: bool = False) -> in
 
 def make_run_cmd(wisl_path: str, with_logging: bool = True) -> str:
     log_flag = "" if with_logging else " -l disabled"
-    return f"dune exec -- wisl verify {wisl_path}{log_flag} > {output}"
+    return f"dune exec --no-build -- wisl verify {wisl_path}{log_flag} > {output}"
+
+
+def build():
+    """Compile the engine with the current Reduction.ml. No time limit:
+    build time must never count towards a test's timeout. Raises
+    CalledProcessError if the build fails."""
+    run_command(compile_cmd, check=True)
 
 def clear_output_file():
     Path(output).write_text("")
@@ -112,7 +125,7 @@ def outcome_signature(trace: str) -> tuple:
     return (tuple(verdicts), tuple(failures), crashed)
 
 
-def test_reductions(simplifications, run_cmd, baseline_sig):
+def test_reductions(simplifications, run_cmd, baseline_sig, timeout):
     """
     Test each simplification by disabling it one at a time and comparing
     the run's outcome against the baseline (unmodified) run.
@@ -140,12 +153,21 @@ def test_reductions(simplifications, run_cmd, baseline_sig):
         with open(reduction_file, "w") as f:
             f.write(patched)
 
+        try:
+            build()
+        except subprocess.CalledProcessError:
+            # A build failure is not a verification outcome: stop instead of
+            # recording the tag as mandatory.
+            restore_reduction_file()
+            print(f"Error: build failed with simplification {simplification} disabled.")
+            sys.exit(1)
+
         skip = False
         try:
             clear_output_file()
-            run_command(run_cmd, timeout=RUN_TIMEOUT)
+            run_command(run_cmd, timeout=timeout)
         except subprocess.TimeoutExpired:
-            print(f"  Timeout ({RUN_TIMEOUT}s) for simplification {simplification}; skipping.")
+            print(f"  Timeout ({timeout:.0f}s) for simplification {simplification}; skipping.")
             mandatory_timeout.append(simplification)
             skip = True
         except Exception as e:
@@ -203,6 +225,7 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     print(f"{'='*60}")
 
     try:
+        build()
         clear_output_file()
         run_command(run_cmd)
     except Exception as e:
@@ -255,7 +278,18 @@ def process_wisl_file(wisl_path: str) -> dict | None:
     processed_reductions = process_simplifications(reductions_array)
     print(f"  All simplifications found:     {processed_reductions}")
 
-    optional, mandatory_error, mandatory_timeout = test_reductions(processed_reductions, test_cmd, baseline_sig)
+    # Time the baseline exactly as the tests are run (no logging) to size the
+    # timeout, and check that it gives the same outcome as the logged run.
+    start = time.monotonic()
+    run_command(test_cmd)
+    baseline_secs = time.monotonic() - start
+    if outcome_signature(Path(output).read_text()) != baseline_sig:
+        print(f"  Baseline outcome differs with logging disabled for {wisl_path}; skipping.")
+        return None
+    timeout = max(MIN_TIMEOUT, TIMEOUT_FACTOR * baseline_secs)
+    print(f"  Baseline run: {baseline_secs:.1f}s; timeout per test: {timeout:.0f}s")
+
+    optional, mandatory_error, mandatory_timeout = test_reductions(processed_reductions, test_cmd, baseline_sig, timeout)
 
     print(f"  Mandatory simplifications (error): {mandatory_error}")
     print(f"  Mandatory simplifications (timeout): {mandatory_timeout}")
@@ -340,6 +374,10 @@ def main():
         print("\nRestoring reduction file...")
         restore_reduction_file()
         print("Reduction file restored.")
+        try:
+            build()  # leave the binary in sync with the restored source
+        except subprocess.CalledProcessError:
+            print("Warning: rebuild after restoring the reduction file failed.")
 
     if results:
         append_to_csv(results, args.output_csv)
