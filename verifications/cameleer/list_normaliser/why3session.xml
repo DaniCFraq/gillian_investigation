@@ -2,57 +2,684 @@
 <!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
 "https://www.why3.org/why3session.dtd">
 <why3session shape_version="6">
-<prover id="0" name="CVC5" version="1.0.6" timelimit="5" steplimit="0" memlimit="1000"/>
-<prover id="1" name="Alt-Ergo" version="2.6.2" timelimit="5" steplimit="0" memlimit="1000"/>
-<prover id="2" name="Z3" version="4.15.2" timelimit="5" steplimit="0" memlimit="1000"/>
+<prover id="0" name="CVC5" version="1.0.6" timelimit="10" steplimit="0" memlimit="1000"/>
 <file format="ocaml" proved="true">
 <path name=".."/><path name="list_normaliser.ml"/>
 <theory name="List_normaliser" proved="true">
  <goal name="nth_v&#39;vc" expl="VC for nth_v" proved="true">
- <proof prover="2"><result status="valid" time="0.005062" steps="10120"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="nth_v&#39;vc.0" expl="VC for nth_v" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="nth_v&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.039552" steps="29430"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="eval&#39;vc" expl="VC for eval" proved="true">
- <proof prover="1"><result status="valid" time="0.140111" steps="1053"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="eval&#39;vc.0" expl="VC for eval" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="eval&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.127394" steps="35541"/></proof>
+   </goal>
+   <goal name="eval&#39;vc.0.1" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.128139" steps="36922"/></proof>
+   </goal>
+   <goal name="eval&#39;vc.0.2" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.144642" steps="36922"/></proof>
+   </goal>
+   <goal name="eval&#39;vc.0.3" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.121303" steps="36318"/></proof>
+   </goal>
+   <goal name="eval&#39;vc.0.4" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.140673" steps="36920"/></proof>
+   </goal>
+   <goal name="eval&#39;vc.0.5" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.138964" steps="37583"/></proof>
+   </goal>
+   <goal name="eval&#39;vc.0.6" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.145347" steps="37583"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="eval_list&#39;vc" expl="VC for eval_list" proved="true">
- <proof prover="0"><result status="valid" time="0.044066" steps="27614"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="eval_list&#39;vc.0" expl="VC for eval_list" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="eval_list&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.043145" steps="30730"/></proof>
+   </goal>
+   <goal name="eval_list&#39;vc.0.1" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.038602" steps="30730"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="eval_list_length" proved="true">
  <transf name="induction_ty_lex" proved="true" >
   <goal name="eval_list_length.0" proved="true">
-  <proof prover="1"><result status="valid" time="0.039965" steps="134"/></proof>
+  <transf name="split_all_right" proved="true" >
+   <goal name="eval_list_length.0.0" proved="true">
+   <proof prover="0"><result status="valid" time="0.079442" steps="39048"/></proof>
+   </goal>
+   <goal name="eval_list_length.0.1" proved="true">
+   <proof prover="0"><result status="valid" time="0.157839" steps="46629"/></proof>
+   </goal>
+  </transf>
   </goal>
  </transf>
  </goal>
- <goal name="no_lit_list&#39;vc" expl="VC for no_lit_list" proved="true">
- <proof prover="1"><result status="valid" time="0.134029" steps="1075"/></proof>
+ <goal name="normal&#39;vc" expl="VC for normal" proved="true">
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="normal&#39;vc.0" expl="VC for normal" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="normal&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.178965" steps="45854"/></proof>
+   </goal>
+   <goal name="normal&#39;vc.0.1" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.182651" steps="47314"/></proof>
+   </goal>
+   <goal name="normal&#39;vc.0.2" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.192712" steps="47344"/></proof>
+   </goal>
+   <goal name="normal&#39;vc.0.3" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.195788" steps="46722"/></proof>
+   </goal>
+   <goal name="normal&#39;vc.0.4" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.188569" steps="47147"/></proof>
+   </goal>
+   <goal name="normal&#39;vc.0.5" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.203252" steps="47816"/></proof>
+   </goal>
+   <goal name="normal&#39;vc.0.6" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.201346" steps="47846"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
- <goal name="no_lit_list_list&#39;vc" expl="VC for no_lit_list_list" proved="true">
- <proof prover="0"><result status="valid" time="0.042438" steps="29695"/></proof>
+ <goal name="normal_list&#39;vc" expl="VC for normal_list" proved="true">
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="normal_list&#39;vc.0" expl="VC for normal_list" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="normal_list&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.043455" steps="32941"/></proof>
+   </goal>
+   <goal name="normal_list&#39;vc.0.1" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.041536" steps="32972"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="from_lit&#39;vc" expl="VC for from_lit" proved="true">
- <proof prover="1"><result status="valid" time="0.089789" steps="903"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="from_lit&#39;vc.0" expl="VC for from_lit" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="from_lit&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.106965" steps="34774"/></proof>
+   </goal>
+   <goal name="from_lit&#39;vc.0.1" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.115694" steps="38909"/></proof>
+   </goal>
+   <goal name="from_lit&#39;vc.0.2" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.107122" steps="38549"/></proof>
+   </goal>
+   <goal name="from_lit&#39;vc.0.3" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.073677" steps="37545"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="map_lit&#39;vc" expl="VC for map_lit" proved="true">
- <proof prover="1"><result status="valid" time="0.105958" steps="900"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="map_lit&#39;vc.0" expl="VC for map_lit" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="map_lit&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.039864" steps="32774"/></proof>
+   </goal>
+   <goal name="map_lit&#39;vc.0.1" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.046927" steps="38148"/></proof>
+   </goal>
+   <goal name="map_lit&#39;vc.0.2" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.130485" steps="46631"/></proof>
+   </goal>
+   <goal name="map_lit&#39;vc.0.3" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.129682" steps="46238"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="nth_e&#39;vc" expl="VC for nth_e" proved="true">
- <proof prover="1"><result status="valid" time="0.079735" steps="639"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="nth_e&#39;vc.0" expl="VC for nth_e" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="nth_e&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.044221" steps="33053"/></proof>
+   </goal>
+   <goal name="nth_e&#39;vc.0.1" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.131158" steps="42019"/></proof>
+   </goal>
+   <goal name="nth_e&#39;vc.0.2" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.077232" steps="40717"/></proof>
+   </goal>
+   <goal name="nth_e&#39;vc.0.3" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.045953" steps="39138"/></proof>
+   </goal>
+   <goal name="nth_e&#39;vc.0.4" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.154731" steps="47538"/></proof>
+   </goal>
+   <goal name="nth_e&#39;vc.0.5" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.113535" steps="42659"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="nth_step_idx&#39;vc" expl="VC for nth_step_idx" proved="true">
- <proof prover="1"><result status="valid" time="0.062105" steps="404"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="nth_step_idx&#39;vc.0" expl="VC for nth_step_idx" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="nth_step_idx&#39;vc.0.0" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.147896" steps="45203"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.1" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.160647" steps="47021"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.2" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.115238" steps="41824"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.3" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.118077" steps="41933"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.4" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.145733" steps="44480"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.5" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.095360" steps="41751"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.6" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.112457" steps="41941"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.7" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.138758" steps="44468"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.8" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.119708" steps="41767"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.9" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.131977" steps="50617"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.10" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.181184" steps="52635"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.11" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.121328" steps="49219"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.12" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.116711" steps="46287"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.13" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.159052" steps="48015"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.14" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.118179" steps="45475"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.15" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.125419" steps="46349"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.16" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.160930" steps="48074"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.17" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.110105" steps="45506"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.18" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.134076" steps="50647"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.19" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.182667" steps="52664"/></proof>
+   </goal>
+   <goal name="nth_step_idx&#39;vc.0.20" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.130308" steps="49312"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="nth_step&#39;vc" expl="VC for nth_step" proved="true">
- <proof prover="1"><result status="valid" time="0.052329" steps="310"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="nth_step&#39;vc.0" expl="VC for nth_step" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="nth_step&#39;vc.0.0" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.110854" steps="41380"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.1" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.122423" steps="42145"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.2" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.074418" steps="39887"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.3" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.076302" steps="39841"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.4" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.131519" steps="42137"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.5" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.072904" steps="39859"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.6" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.081276" steps="39841"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.7" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.128066" steps="42163"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.8" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.071274" steps="39859"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.9" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.083301" steps="43171"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.10" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.130149" steps="48196"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.11" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.085665" steps="43176"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.12" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.080587" steps="41513"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.13" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.137700" steps="45155"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.14" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.081682" steps="41524"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.15" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.076771" steps="41525"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.16" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.138576" steps="45176"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.17" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.085173" steps="41536"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.18" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.083799" steps="43183"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.19" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.142968" steps="48387"/></proof>
+   </goal>
+   <goal name="nth_step&#39;vc.0.20" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.081226" steps="43188"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="len_step&#39;vc" expl="VC for len_step" proved="true">
- <proof prover="1"><result status="valid" time="0.061389" steps="436"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="len_step&#39;vc.0" expl="VC for len_step" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="len_step&#39;vc.0.0" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.100865" steps="37668"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.1" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.107744" steps="39942"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.2" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.071592" steps="38508"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.3" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.109753" steps="37682"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.4" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.108995" steps="39923"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.5" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.079798" steps="38508"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.6" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.123884" steps="39576"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.7" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.116289" steps="40050"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.8" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.076465" steps="38491"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.9" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.129177" steps="45460"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.10" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.123766" steps="44293"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.11" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.079462" steps="41621"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.12" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.117021" steps="42761"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.13" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.122249" steps="42110"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.14" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.078036" steps="40077"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.15" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.120977" steps="42806"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.16" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.116904" steps="42126"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.17" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.078759" steps="40077"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.18" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.130779" steps="45602"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.19" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.129016" steps="44348"/></proof>
+   </goal>
+   <goal name="len_step&#39;vc.0.20" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.074633" steps="41635"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="normalise&#39;vc" expl="VC for normalise" proved="true">
- <proof prover="1"><result status="valid" time="0.324031" steps="3373"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="normalise&#39;vc.0" expl="VC for normalise" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="normalise&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.081926" steps="32305"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.1" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.089133" steps="32609"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.2" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.108498" steps="38986"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.3" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.080310" steps="32602"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.4" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.085319" steps="32619"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.5" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.087546" steps="32672"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.6" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.107270" steps="39055"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.7" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.129234" steps="47646"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.8" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.091539" steps="45390"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.9" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.081510" steps="45992"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.10" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.084429" steps="32305"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.11" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.087503" steps="32609"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.12" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.099963" steps="38978"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.13" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.089257" steps="32602"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.14" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.089659" steps="32619"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.15" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.097847" steps="32672"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.16" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.098040" steps="39047"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.17" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.123513" steps="47127"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.18" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.088779" steps="45390"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.19" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.089878" steps="45992"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.20" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.090272" steps="32447"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.21" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.092466" steps="32598"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.22" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.101880" steps="38971"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.23" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.088293" steps="32591"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.24" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.085902" steps="32608"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.25" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.090662" steps="32661"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.26" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.099782" steps="39040"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.27" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.162066" steps="51206"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.28" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.082049" steps="45390"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.29" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.087233" steps="45992"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.30" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.190071" steps="70307"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.31" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.193697" steps="71110"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.32" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.180336" steps="71400"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.33" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.175227" steps="70644"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.34" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.169923" steps="70730"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.35" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.178694" steps="70966"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.36" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.181274" steps="71279"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.37" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.710922" steps="118457"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.38" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.114474" steps="63705"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.39" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.127475" steps="64304"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.40" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.143781" steps="56044"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.41" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.148175" steps="56356"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.42" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.139064" steps="56657"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.43" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.147868" steps="56582"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.44" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.136569" steps="56343"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.45" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.147361" steps="56499"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.46" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.159054" steps="56811"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.47" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.345277" steps="80702"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.48" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.100348" steps="54546"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.49" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.113876" steps="55127"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.50" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.144753" steps="56100"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.51" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.149919" steps="56427"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.52" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.141565" steps="56713"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.53" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.139695" steps="56358"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.54" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.154686" steps="56648"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.55" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.137459" steps="56520"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.56" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.150326" steps="56827"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.57" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.364682" steps="81070"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.58" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.106942" steps="54560"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.59" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.113567" steps="55141"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.60" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.173614" steps="70661"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.61" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.176284" steps="70957"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.62" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.179934" steps="71259"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.63" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.174452" steps="70893"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.64" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.185665" steps="70904"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.65" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.169761" steps="71398"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.66" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.188972" steps="71701"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.67" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.198643" steps="78946"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.68" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.125109" steps="63680"/></proof>
+   </goal>
+   <goal name="normalise&#39;vc.0.69" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.126712" steps="64357"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
  <goal name="normalise_list&#39;vc" expl="VC for normalise_list" proved="true">
- <proof prover="1"><result status="valid" time="0.085262" steps="772"/></proof>
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="normalise_list&#39;vc.0" expl="VC for normalise_list" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="normalise_list&#39;vc.0.0" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.039117" steps="32990"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.1" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.053958" steps="38732"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.2" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.048730" steps="39289"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.3" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.049047" steps="39316"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.4" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.047723" steps="39345"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.5" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.052011" steps="39805"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.6" expl="variant decrease" proved="true">
+   <proof prover="0"><result status="valid" time="0.052554" steps="40022"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.7" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.115866" steps="44794"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.8" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.120457" steps="43802"/></proof>
+   </goal>
+   <goal name="normalise_list&#39;vc.0.9" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.125360" steps="44023"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="normalise_idempotent" proved="true">
+ <transf name="induction_ty_lex" proved="true" >
+  <goal name="normalise_idempotent.0" proved="true">
+  <transf name="split_all_right" proved="true" >
+   <goal name="normalise_idempotent.0.0" proved="true">
+   <proof prover="0"><result status="valid" time="0.109478" steps="37542"/></proof>
+   </goal>
+   <goal name="normalise_idempotent.0.1" proved="true">
+   <proof prover="0"><result status="valid" time="0.070612" steps="36605"/></proof>
+   </goal>
+   <goal name="normalise_idempotent.0.2" proved="true">
+   <proof prover="0"><result status="valid" time="0.100148" steps="37535"/></proof>
+   </goal>
+   <goal name="normalise_idempotent.0.3" proved="true">
+   <proof prover="0"><result status="valid" time="0.102370" steps="37802"/></proof>
+   </goal>
+   <goal name="normalise_idempotent.0.4" proved="true">
+   <proof prover="0"><result status="valid" time="0.103785" steps="37619"/></proof>
+   </goal>
+   <goal name="normalise_idempotent.0.5" proved="true">
+   <proof prover="0"><result status="valid" time="0.104890" steps="37648"/></proof>
+   </goal>
+   <goal name="normalise_idempotent.0.6" proved="true">
+   <proof prover="0"><result status="valid" time="0.112388" steps="37804"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
  </goal>
 </theory>
 </file>
